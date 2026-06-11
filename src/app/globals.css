@@ -1,26 +1,157 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/*
+ * JeniMcRich Recruitment — design tokens
+ * "Control-room ledger": slate chassis, white work surfaces, one action
+ * color (emerald). Status tints appear only inside chips/pills, never as
+ * section backgrounds. Scores: green >= 80, amber 60-79, red < 60.
+ */
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@theme {
+  /* ---- Surfaces & chrome ---- */
+  --color-canvas: #f8fafc; /* page background (slate-50) */
+  --color-surface: #ffffff; /* cards, tables, modals */
+  --color-sidebar: #0f172a; /* dark slate chassis (slate-900) */
+  --color-sidebar-line: #334155; /* dividers on dark chrome */
+  --color-ink: #0f172a; /* headings */
+
+  /* Legacy starter aliases (kept so existing pages don't break) */
+  --color-background: #f8fafc;
+  --color-foreground: #0f172a;
+
+  /* ---- Primary action (emerald) ---- */
+  --color-primary: #059669;
+  --color-primary-strong: #047857;
+  --color-primary-soft: #d1fae5;
+  --color-primary-faint: #ecfdf5;
+  --color-primary-ink: #065f46;
+
+  /* ---- Status ---- */
+  --color-warning: #f59e0b;
+  --color-warning-soft: #fef3c7;
+  --color-warning-ink: #92400e;
+
+  --color-danger: #ef4444;
+  --color-danger-strong: #dc2626;
+  --color-danger-soft: #fee2e2;
+  --color-danger-ink: #991b1b;
+
+  --color-info: #3b82f6;
+  --color-info-soft: #dbeafe;
+  --color-info-ink: #1e40af;
+
+  /* Interview-stage violet */
+  --color-accent: #8b5cf6;
+  --color-accent-soft: #ede9fe;
+  --color-accent-ink: #5b21b6;
+
+  /* ---- Radii (control 8 / card 12 / modal 14) ---- */
+  --radius-control: 0.5rem;
+  --radius-card: 0.75rem;
+  --radius-modal: 0.875rem;
+
+  /* ---- Shadows (slate-tinted, never gray) ---- */
+  --shadow-card: 0 1px 3px rgb(15 23 42 / 0.08), 0 1px 2px rgb(15 23 42 / 0.06);
+  --shadow-raised: 0 4px 12px rgb(15 23 42 / 0.1), 0 2px 4px rgb(15 23 42 / 0.06);
+  --shadow-overlay: 0 10px 25px rgb(15 23 42 / 0.12), 0 4px 10px rgb(15 23 42 / 0.08);
+
+  /* ---- Motion ---- */
+  --animate-toast-in: toast-in 0.25s ease both;
+  --animate-modal-in: modal-in 0.18s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-fade-in: fade-in 0.15s ease-out both;
+
+  @keyframes toast-in {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes modal-in {
+    from {
+      opacity: 0;
+      transform: translateY(8px) scale(0.985);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer base {
+  body {
+    background-color: var(--color-canvas);
+    color: #1e293b; /* slate-800 — dense data reads better than near-black */
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  ::selection {
+    background-color: var(--color-primary-soft);
+    color: var(--color-primary-ink);
+  }
+
+  /* Fallback focus ring for anything that doesn't bring its own.
+     Components that render an emerald halo set outline-none themselves. */
+  :focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/* The system's shared micro-label register: table headers, field labels,
+   stat labels, kanban column heads all use this exact voice. */
+@utility micro-label {
+  font-size: 11px;
+  line-height: 1.35;
+  font-weight: 600;
+  letter-spacing: 0.045em;
+  text-transform: uppercase;
+}
+
+/* Slim slate scrollbar for kanban lanes / overflow tables. */
+@utility scrollbar-slim {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+
+  &::-webkit-scrollbar {
+    height: 8px;
+    width: 8px;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 8px;
+  }
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
 }
