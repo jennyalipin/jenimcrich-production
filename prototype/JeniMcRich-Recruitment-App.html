@@ -1,0 +1,1255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JeniMcRich Recruitment</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  --slate-900:#0f172a;--slate-800:#1e293b;--slate-700:#334155;--slate-600:#475569;
+  --slate-500:#64748b;--slate-400:#94a3b8;--slate-300:#cbd5e1;--slate-200:#e2e8f0;
+  --slate-100:#f1f5f9;--slate-50:#f8fafc;
+  --emerald-600:#059669;--emerald-500:#10b981;--emerald-100:#d1fae5;--emerald-50:#ecfdf5;
+  --amber-500:#f59e0b;--amber-100:#fef3c7;--red-500:#ef4444;--red-100:#fee2e2;
+  --blue-500:#3b82f6;--blue-100:#dbeafe;--purple-500:#8b5cf6;--purple-100:#ede9fe;
+  --shadow:0 1px 3px rgba(15,23,42,.08),0 1px 2px rgba(15,23,42,.06);
+  --shadow-lg:0 10px 25px rgba(15,23,42,.12);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--slate-100);color:var(--slate-800);font-size:14px}
+button{font-family:inherit;cursor:pointer}
+input,select,textarea{font-family:inherit;font-size:14px}
+
+/* ---------- Login ---------- */
+#loginScreen{position:fixed;inset:0;background:linear-gradient(135deg,var(--slate-900) 0%,#134e4a 100%);display:flex;align-items:center;justify-content:center;z-index:1000}
+.login-card{background:#fff;border-radius:16px;padding:40px;width:400px;box-shadow:var(--shadow-lg)}
+.login-logo{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.logo-mark{width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,var(--emerald-500),#0d9488);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:18px}
+.login-card h1{font-size:22px;color:var(--slate-900)}
+.login-sub{color:var(--slate-500);margin:4px 0 24px}
+.field{margin-bottom:14px}
+.field label{display:block;font-weight:600;font-size:12px;color:var(--slate-600);margin-bottom:5px;text-transform:uppercase;letter-spacing:.4px}
+.field input,.field select,.field textarea{width:100%;padding:10px 12px;border:1px solid var(--slate-300);border-radius:8px;outline:none;transition:border .15s}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--emerald-500);box-shadow:0 0 0 3px var(--emerald-100)}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:9px 16px;border-radius:8px;border:none;font-weight:600;font-size:13.5px;transition:all .15s}
+.btn-primary{background:var(--emerald-600);color:#fff}
+.btn-primary:hover{background:#047857}
+.btn-dark{background:var(--slate-800);color:#fff}
+.btn-dark:hover{background:var(--slate-900)}
+.btn-ghost{background:transparent;color:var(--slate-600);border:1px solid var(--slate-300)}
+.btn-ghost:hover{background:var(--slate-100)}
+.btn-danger{background:var(--red-500);color:#fff}
+.btn-sm{padding:6px 10px;font-size:12.5px}
+.btn-block{width:100%;justify-content:center}
+.login-err{background:var(--red-100);color:#b91c1c;padding:10px;border-radius:8px;font-size:13px;margin-bottom:12px;display:none}
+.login-divider{display:flex;align-items:center;gap:10px;color:var(--slate-400);font-size:12px;margin:16px 0}
+.login-divider::before,.login-divider::after{content:'';flex:1;height:1px;background:var(--slate-200)}
+
+/* ---------- Layout ---------- */
+#app{display:none}
+.sidebar{position:fixed;left:0;top:0;bottom:0;width:230px;background:var(--slate-900);color:var(--slate-300);display:flex;flex-direction:column;z-index:50}
+.sidebar-brand{display:flex;align-items:center;gap:10px;padding:18px 16px;border-bottom:1px solid var(--slate-700)}
+.sidebar-brand .name{font-weight:700;color:#fff;font-size:15px;line-height:1.15}
+.sidebar-brand .tag{font-size:10.5px;color:var(--slate-400)}
+.nav{flex:1;padding:12px 8px;overflow-y:auto}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;color:var(--slate-300);font-weight:500;margin-bottom:2px;border:none;background:none;width:100%;text-align:left;font-size:13.5px}
+.nav-item:hover{background:var(--slate-800);color:#fff}
+.nav-item.active{background:var(--emerald-600);color:#fff}
+.nav-item .nv-ic{width:18px;text-align:center}
+.nav-badge{margin-left:auto;background:var(--red-500);color:#fff;font-size:10.5px;font-weight:700;border-radius:10px;padding:1px 7px}
+.sidebar-foot{padding:14px 16px;border-top:1px solid var(--slate-700);font-size:12.5px}
+.sidebar-foot .u{color:#fff;font-weight:600}
+.main{margin-left:230px;min-height:100vh}
+.topbar{position:sticky;top:0;background:#fff;border-bottom:1px solid var(--slate-200);padding:12px 28px;display:flex;align-items:center;gap:14px;z-index:40}
+.topbar h2{font-size:18px;color:var(--slate-900);flex:1}
+.bell{position:relative;background:none;border:1px solid var(--slate-300);border-radius:8px;width:36px;height:36px;font-size:16px}
+.bell-dot{position:absolute;top:-5px;right:-5px;background:var(--red-500);color:#fff;border-radius:10px;font-size:10px;font-weight:700;padding:1px 5px}
+.content{padding:24px 28px 60px}
+
+/* ---------- Common components ---------- */
+.card{background:#fff;border-radius:12px;box-shadow:var(--shadow);border:1px solid var(--slate-200)}
+.card-pad{padding:18px 20px}
+.grid{display:grid;gap:16px}
+.g-4{grid-template-columns:repeat(4,1fr)}
+.g-3{grid-template-columns:repeat(3,1fr)}
+.g-2{grid-template-columns:repeat(2,1fr)}
+.stat .lbl{font-size:12px;color:var(--slate-500);font-weight:600;text-transform:uppercase;letter-spacing:.4px}
+.stat .val{font-size:26px;font-weight:800;color:var(--slate-900);margin-top:4px}
+.stat .sub{font-size:12px;color:var(--slate-500);margin-top:2px}
+.badge{display:inline-flex;align-items:center;gap:4px;padding:2.5px 9px;border-radius:20px;font-size:11.5px;font-weight:600;white-space:nowrap}
+.b-emerald{background:var(--emerald-100);color:#065f46}
+.b-amber{background:var(--amber-100);color:#92400e}
+.b-red{background:var(--red-100);color:#991b1b}
+.b-blue{background:var(--blue-100);color:#1e40af}
+.b-slate{background:var(--slate-200);color:var(--slate-700)}
+.b-purple{background:var(--purple-100);color:#5b21b6}
+.score-pill{display:inline-flex;align-items:center;justify-content:center;min-width:44px;padding:3px 8px;border-radius:8px;font-weight:800;font-size:13px}
+.s-high{background:var(--emerald-100);color:#065f46}
+.s-mid{background:var(--amber-100);color:#92400e}
+.s-low{background:var(--red-100);color:#991b1b}
+table.tbl{width:100%;border-collapse:collapse}
+.tbl th{text-align:left;font-size:11.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--slate-500);padding:10px 12px;border-bottom:1px solid var(--slate-200);background:var(--slate-50)}
+.tbl td{padding:11px 12px;border-bottom:1px solid var(--slate-100);vertical-align:middle}
+.tbl tr:hover td{background:var(--slate-50)}
+.tbl tr.sel td{background:var(--emerald-50)}
+.link{color:var(--emerald-600);font-weight:600;cursor:pointer;background:none;border:none;font-size:inherit;padding:0}
+.link:hover{text-decoration:underline}
+.flag-btn{background:none;border:none;font-size:16px;opacity:.35}
+.flag-btn.on{opacity:1}
+.muted{color:var(--slate-500)}
+.small{font-size:12.5px}
+.flex{display:flex;align-items:center;gap:10px}
+.flex-between{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.wrap{flex-wrap:wrap}
+.mt8{margin-top:8px}.mt12{margin-top:12px}.mt16{margin-top:16px}.mt24{margin-top:24px}
+.mb8{margin-bottom:8px}.mb12{margin-bottom:12px}.mb16{margin-bottom:16px}
+h3.sec{font-size:15px;color:var(--slate-900);margin-bottom:10px}
+.empty{padding:40px;text-align:center;color:var(--slate-400)}
+
+/* ---------- Modal ---------- */
+.modal-bg{position:fixed;inset:0;background:rgba(15,23,42,.55);display:none;align-items:flex-start;justify-content:center;z-index:200;overflow-y:auto;padding:40px 16px}
+.modal-bg.open{display:flex}
+.modal{background:#fff;border-radius:14px;width:640px;max-width:100%;box-shadow:var(--shadow-lg)}
+.modal.wide{width:860px}
+.modal-head{padding:16px 22px;border-bottom:1px solid var(--slate-200);display:flex;align-items:center;justify-content:space-between}
+.modal-head h3{font-size:16px;color:var(--slate-900)}
+.modal-body{padding:20px 22px;max-height:65vh;overflow-y:auto}
+.modal-foot{padding:14px 22px;border-top:1px solid var(--slate-200);display:flex;justify-content:flex-end;gap:10px}
+.x-btn{background:none;border:none;font-size:20px;color:var(--slate-400)}
+
+/* ---------- Toast ---------- */
+#toasts{position:fixed;bottom:20px;right:20px;z-index:500;display:flex;flex-direction:column;gap:8px}
+.toast{background:var(--slate-900);color:#fff;padding:11px 16px;border-radius:10px;box-shadow:var(--shadow-lg);font-size:13px;max-width:340px;animation:tin .25s ease}
+.toast.ok{border-left:4px solid var(--emerald-500)}
+.toast.warn{border-left:4px solid var(--amber-500)}
+@keyframes tin{from{transform:translateY(12px);opacity:0}to{transform:none;opacity:1}}
+
+/* ---------- Kanban ---------- */
+.kanban{display:flex;gap:14px;overflow-x:auto;padding-bottom:12px;align-items:flex-start}
+.kcol{background:var(--slate-50);border:1px solid var(--slate-200);border-radius:12px;min-width:240px;width:240px;flex-shrink:0}
+.kcol-head{padding:11px 14px;font-weight:700;font-size:13px;color:var(--slate-700);border-bottom:1px solid var(--slate-200);display:flex;justify-content:space-between;align-items:center}
+.kcol-cnt{background:var(--slate-200);border-radius:10px;padding:1px 8px;font-size:11.5px}
+.kcol-body{padding:10px;min-height:120px;display:flex;flex-direction:column;gap:8px}
+.kcol.dragover{outline:2px dashed var(--emerald-500);outline-offset:-3px;background:var(--emerald-50)}
+.kcard{background:#fff;border:1px solid var(--slate-200);border-radius:10px;padding:10px 12px;cursor:grab;box-shadow:var(--shadow)}
+.kcard:active{cursor:grabbing}
+.kcard .nm{font-weight:700;font-size:13px;color:var(--slate-900)}
+.kcard .rl{font-size:11.5px;color:var(--slate-500);margin:2px 0 6px}
+.kcard.stalled{border-left:3px solid var(--amber-500)}
+
+/* ---------- Matchmaker ---------- */
+.dropzone{border:2px dashed var(--slate-300);border-radius:14px;padding:40px;text-align:center;background:#fff;transition:all .15s}
+.dropzone.over{border-color:var(--emerald-500);background:var(--emerald-50)}
+.stage-list{list-style:none;margin-top:14px}
+.stage-list li{display:flex;align-items:center;gap:10px;padding:7px 0;color:var(--slate-400);font-weight:500}
+.stage-list li.act{color:var(--slate-900)}
+.stage-list li.done{color:var(--emerald-600)}
+.prog{height:8px;background:var(--slate-200);border-radius:6px;overflow:hidden;margin-top:14px}
+.prog>div{height:100%;background:var(--emerald-500);width:0;transition:width .4s}
+.spin{display:inline-block;width:14px;height:14px;border:2px solid var(--slate-300);border-top-color:var(--emerald-600);border-radius:50%;animation:sp 1s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+/* ---------- Calendar ---------- */
+.cal{display:grid;grid-template-columns:repeat(7,1fr);border-left:1px solid var(--slate-200);border-top:1px solid var(--slate-200)}
+.cal-h{background:var(--slate-50);padding:8px;font-size:11.5px;font-weight:700;text-transform:uppercase;color:var(--slate-500);border-right:1px solid var(--slate-200);border-bottom:1px solid var(--slate-200);text-align:center}
+.cal-d{min-height:92px;border-right:1px solid var(--slate-200);border-bottom:1px solid var(--slate-200);padding:6px;background:#fff}
+.cal-d.dim{background:var(--slate-50)}
+.cal-d .dn{font-size:12px;font-weight:600;color:var(--slate-500)}
+.cal-d.today .dn{background:var(--emerald-600);color:#fff;border-radius:50%;width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center}
+.cal-ev{background:var(--emerald-100);color:#065f46;border-radius:5px;padding:2px 6px;font-size:10.5px;font-weight:600;margin-top:3px;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ---------- Misc ---------- */
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--slate-200);margin-bottom:16px}
+.tab{padding:9px 16px;border:none;background:none;font-weight:600;color:var(--slate-500);border-bottom:2px solid transparent;font-size:13.5px}
+.tab.active{color:var(--emerald-600);border-bottom-color:var(--emerald-600)}
+.note{background:var(--slate-50);border:1px solid var(--slate-200);border-radius:10px;padding:12px 14px;margin-bottom:10px}
+.timeline{list-style:none}
+.timeline li{position:relative;padding:0 0 16px 22px;border-left:2px solid var(--slate-200);margin-left:6px}
+.timeline li::before{content:'';position:absolute;left:-6px;top:3px;width:10px;height:10px;border-radius:50%;background:var(--emerald-500)}
+.bulkbar{position:sticky;top:61px;z-index:30;background:var(--slate-900);color:#fff;border-radius:12px;padding:10px 16px;display:none;align-items:center;gap:10px;margin-bottom:14px;box-shadow:var(--shadow-lg)}
+.bulkbar.show{display:flex}
+.filter-side{width:215px;flex-shrink:0}
+.filter-group{margin-bottom:16px}
+.filter-group .fg-t{font-size:11.5px;font-weight:700;text-transform:uppercase;color:var(--slate-500);margin-bottom:7px;letter-spacing:.4px}
+.fchk{display:flex;align-items:center;gap:7px;padding:3.5px 0;font-size:13px;color:var(--slate-700);cursor:pointer}
+.tag-chip{cursor:pointer}
+.match-card{border-left:4px solid var(--slate-300)}
+.match-card.hi{border-left-color:var(--emerald-500)}
+.match-card.md{border-left-color:var(--amber-500)}
+.match-card.lo{border-left-color:var(--red-500)}
+.edge{background:linear-gradient(90deg,var(--emerald-50),#fff);border:1px solid var(--emerald-100);border-radius:8px;padding:9px 12px;font-size:13px;margin:10px 0}
+.pc-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.pc-list{list-style:none;font-size:13px}
+.pc-list li{padding:3px 0 3px 20px;position:relative}
+.pc-list.pros li::before{content:'✓';position:absolute;left:0;color:var(--emerald-600);font-weight:700}
+.pc-list.cons li::before{content:'✕';position:absolute;left:0;color:var(--red-500);font-weight:700}
+.slot{border:1px solid var(--slate-300);border-radius:8px;padding:7px 12px;background:#fff;font-weight:600;font-size:13px}
+.slot:hover{border-color:var(--emerald-500);background:var(--emerald-50)}
+.slot.taken{opacity:.4;text-decoration:line-through;pointer-events:none}
+.sc-row{display:grid;grid-template-columns:1fr 160px;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid var(--slate-100)}
+.stars button{background:none;border:none;font-size:18px;opacity:.25;padding:0 1px}
+.stars button.on{opacity:1}
+.cmp-grid{display:grid;gap:14px}
+@media print{.sidebar,.topbar,.bulkbar{display:none}.main{margin:0}}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginScreen">
+  <div class="login-card">
+    <div class="login-logo"><div class="logo-mark">JM</div><h1>JeniMcRich Recruitment</h1></div>
+    <p class="login-sub">Recruiter Workspace — sign in to continue</p>
+    <div class="login-err" id="loginErr"></div>
+    <div class="field"><label>Work Email</label><input id="loginEmail" type="email" placeholder="you@jenimcrich.com"></div>
+    <div class="field"><label>Password</label><input id="loginPass" type="password" placeholder="••••••••"></div>
+    <button class="btn btn-primary btn-block" onclick="doLogin()">Sign In</button>
+    <div class="login-divider">or</div>
+    <button class="btn btn-dark btn-block" onclick="demoLogin()">⚡ Demo Login (Recruiter)</button>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <aside class="sidebar">
+    <div class="sidebar-brand"><div class="logo-mark">JM</div><div><div class="name">JeniMcRich</div><div class="tag">RECRUITMENT</div></div></div>
+    <nav class="nav" id="navMenu"></nav>
+    <div class="sidebar-foot"><div class="u" id="userName">—</div><div class="muted" id="userEmail">—</div><button class="link" style="color:var(--slate-400);margin-top:6px" onclick="logout()">Sign out</button></div>
+  </aside>
+  <div class="main">
+    <div class="topbar">
+      <h2 id="pageTitle">Dashboard</h2>
+      <button class="bell" onclick="openNotifs()" title="Notifications">🔔<span class="bell-dot" id="bellDot" style="display:none">0</span></button>
+    </div>
+    <div class="content" id="content"></div>
+  </div>
+</div>
+
+<div class="modal-bg" id="modalBg"><div class="modal" id="modalBox"></div></div>
+<div id="toasts"></div>
+<input type="file" id="fileInput" style="display:none" accept=".txt,.pdf,.doc,.docx">
+
+<script>
+/* ================= UTILITIES ================= */
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const daysAgo=n=>{const d=new Date();d.setDate(d.getDate()-n);return d.toISOString()};
+const daysAhead=n=>{const d=new Date();d.setDate(d.getDate()+n);return d.toISOString().slice(0,10)};
+const fmtD=iso=>new Date(iso).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+const fmtDT=iso=>new Date(iso).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+const daysIn=iso=>Math.floor((Date.now()-new Date(iso))/864e5);
+const uid=()=>Math.random().toString(36).slice(2,9);
+function toast(msg,cls='ok'){const t=document.createElement('div');t.className='toast '+cls;t.innerHTML=msg;$('toasts').appendChild(t);setTimeout(()=>t.remove(),4200)}
+function scoreCls(s){return s>=80?'s-high':s>=60?'s-mid':'s-low'}
+
+/* ================= DATA ================= */
+const STAGES=['Applied','Screening','Interview','Offer','Hired','Rejected'];
+const STAGE_BADGE={Applied:'b-slate',Screening:'b-blue',Interview:'b-purple',Offer:'b-amber',Hired:'b-emerald',Rejected:'b-red'};
+const SOURCES=['LinkedIn','Referral','Job Portal','Indeed','Agency'];
+const SC_CATS=[{k:'Technical Skills',w:3},{k:'Industry Experience',w:3},{k:'Communication',w:2},{k:'Leadership',w:2},{k:'Culture Fit',w:1},{k:'Problem-Solving',w:2}];
+
+function seedData(){
+ const J=(id,title,client,location,skills,minYears,salary,reqs,desc,status='Open',openedDays=40)=>({id,title,client,location,skills,minYears,salary,reqs,desc,status,openedAt:daysAgo(openedDays)});
+ const jobs=[
+  J('j1','Plant Manager – Cement','Helix Cement Corp','Cebu, PH',[['Plant Operations',3],['Kiln Management',3],['Safety Compliance',2],['Team Leadership',2],['Budgeting',1]],10,'₱180k–240k/mo',['10+ yrs cement plant operations','Kiln & pyro-processing expertise','ISO 45001 safety leadership','Managed 100+ headcount'],'Lead full plant P&L for a 2.5 MTPA cement line.'),
+  J('j2','Quarry Supervisor – Aggregates','Stonebridge Aggregates','Rizal, PH',[['Quarry Operations',3],['Blasting',3],['Heavy Equipment',2],['Safety Compliance',2],['Production Planning',1]],6,'₱90k–120k/mo',['6+ yrs quarry supervision','Licensed blaster preferred','DENR/MGB compliance','Fleet & crusher scheduling'],'Supervise drilling, blasting and crushing operations.'),
+  J('j3','Maintenance Reliability Engineer','Orion Mining Group','Davao, PH',[['Reliability Engineering',3],['Predictive Maintenance',3],['SAP PM',2],['Root Cause Analysis',2],['Vibration Analysis',2]],5,'₱110k–150k/mo',['5+ yrs reliability in mining/heavy industry','CMRP preferred','Predictive maintenance program ownership','SAP PM proficiency'],'Own asset reliability strategy for fixed & mobile plant.'),
+  J('j4','HSE Manager – Mining','Orion Mining Group','Surigao, PH',[['Safety Compliance',3],['HSE Management',3],['Incident Investigation',2],['Training',2],['Audit',1]],8,'₱140k–180k/mo',['8+ yrs HSE in mining','ISO 45001 lead auditor','Fatality-prevention programs','Regulatory liaison (DENR, DOLE)'],'Drive site-wide HSE strategy across two mine sites.'),
+  J('j5','Electrical Engineer – Plant','Helix Cement Corp','Cebu, PH',[['Electrical Systems',3],['PLC Programming',2],['Motor Control',2],['Power Distribution',2],['Safety Compliance',1]],4,'₱80k–110k/mo',['4+ yrs plant electrical','PLC/SCADA exposure','MV/LV distribution','PEE/REE license'],'Maintain and improve plant electrical systems.'),
+  J('j6','Logistics Coordinator','Stonebridge Aggregates','Rizal, PH',[['Logistics',3],['Dispatch',2],['ERP Systems',2],['Vendor Management',1],['Excel',1]],3,'₱45k–60k/mo',['3+ yrs logistics/dispatch','Truck fleet coordination','ERP literacy','Strong Excel'],'Coordinate outbound aggregate dispatch & fleet.','On Hold',25),
+ ];
+ const C=(o)=>Object.assign({tags:[],flagged:false,docs:[],notes:[],scorecards:[],interviews:[],activity:[],archived:false},o);
+ const mk=(id,name,jobId,stage,stageDays,source,years,skills,certs,summary,salary,notice,extra={})=>{
+  const c=C({id,name,email:name.toLowerCase().replace(/[^a-z]+/g,'.')+'@gmail.com',phone:'+63 9'+String(Math.floor(Math.random()*9e8+1e8)),jobId,stage,source,yearsExp:years,skills,certifications:certs,summary,expectedSalary:salary,noticePeriod:notice,appliedAt:daysAgo(stageDays+Math.floor(Math.random()*20)+5),stageEnteredAt:daysAgo(stageDays),lastActivityAt:daysAgo(stageDays),resumeText:summary+' Skills: '+skills.map(s=>s[0]).join(', ')+'. Certifications: '+certs.join(', ')+'.',...extra});
+  c.activity.push({ts:c.appliedAt,type:'stage',text:'Application received via '+source,by:'System'});
+  if(stage!=='Applied')c.activity.push({ts:c.stageEnteredAt,type:'stage',text:'Moved to '+stage,by:'Jenny M.'});
+  return c;
+ };
+ const candidates=[
+  mk('c1','Alex Miller','j1','Interview',3,'LinkedIn',14,[['Plant Operations',14],['Kiln Management',11],['Safety Compliance',9],['Team Leadership',10],['Budgeting',6]],['ISO 45001 Lead Auditor','Six Sigma Black Belt'],'Seasoned cement plant leader; ran a 3 MTPA integrated line with 220 staff and cut kiln downtime 18%.','₱220,000/mo','60 days',{tags:['Top Tier','Leadership'],flagged:true,docs:[{name:'Alex_Miller_Resume.pdf',cat:'Resume',date:daysAgo(20)},{name:'ISO45001_Cert.pdf',cat:'Certification',date:daysAgo(19)}],interviews:[{id:uid(),date:daysAhead(1),time:'10:00',interviewer:'Jenny M.',type:'Final Panel',status:'Scheduled'}]}),
+  mk('c2','Sarah Jenkins','j3','Offer',2,'Referral',8,[['Reliability Engineering',8],['Predictive Maintenance',7],['SAP PM',5],['Root Cause Analysis',6],['Vibration Analysis',4]],['CMRP','ISO 18436 Cat II Vibration'],'Reliability engineer who built a predictive maintenance program reducing unplanned downtime 31% at a nickel mine.','₱135,000/mo','30 days',{tags:['Top Tier'],flagged:true,docs:[{name:'Sarah_Jenkins_Resume.pdf',cat:'Resume',date:daysAgo(30)}],scorecards:[{id:uid(),interviewer:'R. Santos',date:daysAgo(6),ratings:{'Technical Skills':5,'Industry Experience':4,'Communication':4,'Leadership':4,'Culture Fit':5,'Problem-Solving':5},summary:'Outstanding technical depth; clear PdM program ownership.',rec:'Strong Hire'}]}),
+  mk('c3','Marcus Thompson','j2','Screening',7,'Job Portal',7,[['Quarry Operations',7],['Blasting',5],['Heavy Equipment',6],['Safety Compliance',4],['Production Planning',3]],['Licensed Blaster (PNP-FED)','NCII Heavy Equipment'],'Quarry supervisor with full drill-blast-crush cycle ownership; improved crusher utilization to 87%.','₱105,000/mo','30 days',{tags:['Remote Ready']}),
+  mk('c4','Diana Reyes','j4','Interview',6,'LinkedIn',11,[['Safety Compliance',11],['HSE Management',9],['Incident Investigation',8],['Training',7],['Audit',6]],['ISO 45001 Lead Auditor','NEBOSH IGC'],'HSE leader across 3 mine sites; led a 4-year LTI-free program and DENR audit readiness.','₱165,000/mo','45 days',{tags:['Top Tier','Leadership'],interviews:[{id:uid(),date:daysAhead(0),time:'15:00',interviewer:'R. Santos',type:'Technical',status:'Scheduled'}]}),
+  mk('c5','James Uy','j5','Applied',2,'Indeed',5,[['Electrical Systems',5],['PLC Programming',3],['Motor Control',4],['Power Distribution',3]],['REE License'],'Plant electrical engineer; led MV switchgear upgrade and PLC migration to S7-1500.','₱95,000/mo','30 days'),
+  mk('c6','Maria Santos','j1','Screening',9,'Referral',9,[['Plant Operations',9],['Safety Compliance',7],['Team Leadership',6],['Budgeting',5]],['Six Sigma Green Belt'],'Production manager in cement grinding; strong cost control, limited kiln exposure.','₱170,000/mo','60 days',{tags:['Leadership']}),
+  mk('c7','Robert Lim','j3','Applied',1,'LinkedIn',4,[['Predictive Maintenance',4],['Vibration Analysis',3],['Root Cause Analysis',3]],['ISO 18436 Cat I'],'Condition-monitoring analyst moving into reliability engineering; strong vibration analysis.','₱90,000/mo','15 days'),
+  mk('c8','Angela Cruz','j6','Interview',8,'Job Portal',6,[['Logistics',6],['Dispatch',5],['ERP Systems',4],['Excel',6],['Vendor Management',3]],['CLTD'],'Dispatch lead for a 60-truck aggregates fleet; cut idle time 22% with route scheduling.','₱55,000/mo','30 days',{interviews:[{id:uid(),date:daysAhead(3),time:'09:30',interviewer:'Jenny M.',type:'HR Interview',status:'Scheduled'}]}),
+  mk('c9','Kevin Tan','j2','Applied',12,'Indeed',3,[['Heavy Equipment',3],['Quarry Operations',2]],['NCII Heavy Equipment'],'Heavy equipment operator stepping up to supervision; limited blasting exposure.','₱70,000/mo','15 days'),
+  mk('c10','Patricia Gomez','j4','Screening',4,'Agency',8,[['HSE Management',8],['Safety Compliance',8],['Training',6],['Audit',4]],['NEBOSH IGC','OSHA 30'],'HSE superintendent in construction transitioning to mining; strong training systems.','₱150,000/mo','30 days'),
+  mk('c11','Daniel Ocampo','j1','Rejected',5,'Job Portal',6,[['Plant Operations',6],['Budgeting',3]],[],'Operations supervisor in food manufacturing; no heavy-industry exposure.','₱140,000/mo','30 days'),
+  mk('c12','Grace Villanueva','j5','Hired',1,'Referral',6,[['Electrical Systems',6],['PLC Programming',5],['Motor Control',4],['Power Distribution',4],['Safety Compliance',3]],['PEE License'],'Senior plant electrician turned engineer; SCADA and MV distribution strength.','₱105,000/mo','30 days',{tags:['Top Tier']}),
+  mk('c13','Carlo Mendoza','j3','Interview',11,'LinkedIn',7,[['Reliability Engineering',6],['SAP PM',6],['Root Cause Analysis',5],['Predictive Maintenance',3]],['CMRP (in progress)'],'Maintenance planner with strong SAP PM mastery; building PdM exposure.','₱120,000/mo','45 days',{interviews:[{id:uid(),date:daysAhead(5),time:'13:00',interviewer:'R. Santos',type:'Technical',status:'Scheduled'}]}),
+  mk('c14','Liza Fernandez','j6','Applied',3,'Job Portal',4,[['Logistics',4],['ERP Systems',3],['Excel',5]],[],'Logistics analyst with SAP MM background; no dispatch floor experience.','₱48,000/mo','30 days'),
+  mk('c15','Miguel Bautista','j2','Offer',1,'Referral',9,[['Quarry Operations',9],['Blasting',8],['Heavy Equipment',7],['Safety Compliance',6],['Production Planning',5]],['Licensed Blaster (PNP-FED)','OSHA 30'],'Veteran quarry supervisor; ran 3 quarry pits concurrently with zero LTI over 5 years.','₱118,000/mo','60 days',{tags:['Top Tier'],flagged:true,scorecards:[{id:uid(),interviewer:'Jenny M.',date:daysAgo(4),ratings:{'Technical Skills':5,'Industry Experience':5,'Communication':3,'Leadership':4,'Culture Fit':4,'Problem-Solving':4},summary:'Deep quarry expertise, slightly reserved communicator.',rec:'Hire'}]}),
+  mk('c16','Hannah Dizon','j4','Applied',6,'LinkedIn',5,[['Safety Compliance',5],['Training',4],['Incident Investigation',3]],['OSHA 30'],'Safety officer in manufacturing; growing into HSE management.','₱100,000/mo','30 days'),
+  mk('c17','Paolo Ramos','j5','Screening',13,'Indeed',4,[['Electrical Systems',4],['Power Distribution',3],['PLC Programming',2]],['REE License'],'Facilities electrical engineer; commercial buildings background.','₱85,000/mo','30 days'),
+  mk('c18','Nicole Aquino','j1','Applied',8,'Agency',12,[['Plant Operations',12],['Kiln Management',8],['Team Leadership',9],['Safety Compliance',7],['Budgeting',8]],['Six Sigma Black Belt'],'Deputy plant manager at a competing cement producer; kiln and finance fluent.','₱210,000/mo','90 days',{tags:['Top Tier'],flagged:true}),
+ ];
+ const templates=[
+  {id:'t1',name:'Interview Invitation',category:'Interview',subject:'Interview Invitation – {{job_title}} at {{client}}',body:'Hi {{candidate_name}},\n\nThank you for your interest in the {{job_title}} role with {{client}}. We would like to invite you to an interview.\n\nProposed date: {{interview_date}}\n\nPlease confirm your availability.\n\nBest regards,\n{{recruiter_name}}\nJeniMcRich Recruitment'},
+  {id:'t2',name:'Rejection – After Review',category:'Rejection',subject:'Update on your application – {{job_title}}',body:'Hi {{candidate_name}},\n\nThank you for applying for the {{job_title}} position. After careful review, we have decided to move forward with other candidates at this time.\n\nWe will keep your profile in our talent pipeline for future roles.\n\nKind regards,\n{{recruiter_name}}\nJeniMcRich Recruitment'},
+  {id:'t3',name:'Offer Letter Cover','category':'Offer',subject:'Offer of Employment – {{job_title}}',body:'Dear {{candidate_name}},\n\nCongratulations! {{client}} is pleased to extend an offer for the position of {{job_title}}.\n\nPlease find the formal offer attached. Kindly confirm receipt and respond within 5 business days.\n\nWarm regards,\n{{recruiter_name}}\nJeniMcRich Recruitment'},
+  {id:'t4',name:'Status Update – In Progress',category:'Update',subject:'Your application status – {{job_title}}',body:'Hi {{candidate_name}},\n\nA quick update: your application for {{job_title}} is currently at the {{stage}} stage. We will reach out with next steps shortly.\n\nThanks for your patience,\n{{recruiter_name}}'},
+  {id:'t5',name:'Missing Documents Reminder',category:'Update',subject:'Action needed – documents for your application',body:'Hi {{candidate_name}},\n\nWe noticed your profile for {{job_title}} is missing required documents. Please upload them at your earliest convenience so we can keep your application moving.\n\nThank you,\n{{recruiter_name}}'},
+ ];
+ return {jobs,candidates,templates,emailLog:[],settings:{stalledDays:5,stalledEnabled:true},user:null};
+}
+
+let DB;
+function loadDB(){
+ try{const raw=localStorage.getItem('jmr_db_v1');if(raw){DB=JSON.parse(raw);return}}catch(e){}
+ DB=seedData();saveDB();
+}
+function saveDB(){try{localStorage.setItem('jmr_db_v1',JSON.stringify(DB))}catch(e){}}
+function resetDB(){try{localStorage.removeItem('jmr_db_v1')}catch(e){};DB=seedData();saveDB();route(currentView);toast('Demo data reset')}
+const jobById=id=>DB.jobs.find(j=>j.id===id);
+const candById=id=>DB.candidates.find(c=>c.id===id);
+function logAct(c,type,text){c.activity.unshift({ts:new Date().toISOString(),type,text,by:DB.user?.name||'Recruiter'});c.lastActivityAt=new Date().toISOString()}
+
+/* ================= MATCH SCORING ENGINE ================= */
+function matchScore(cand,job){
+ let total=0,got=0;const pros=[],cons=[],gaps=[];
+ job.skills.forEach(([skill,w])=>{
+  total+=w*10;
+  const cs=cand.skills.find(s=>s[0].toLowerCase()===skill.toLowerCase());
+  if(cs){const ratio=Math.min(cs[1]/Math.max(job.minYears*0.6,1),1);got+=w*10*(0.5+0.5*ratio);
+   pros.push(`${skill}: ${cs[1]} yrs experience${ratio>=1?' (exceeds requirement)':''}`);}
+  else{cons.push(`No demonstrated ${skill} experience`);gaps.push(skill);}
+ });
+ total+=20;
+ const yr=Math.min(cand.yearsExp/job.minYears,1.25);got+=20*Math.min(yr,1);
+ if(cand.yearsExp>=job.minYears)pros.push(`${cand.yearsExp} yrs total experience vs ${job.minYears} required`);
+ else cons.push(`Only ${cand.yearsExp} yrs total experience (${job.minYears} required)`);
+ if(cand.certifications.length){got+=Math.min(cand.certifications.length*2,6);total+=6;pros.push('Certifications: '+cand.certifications.join(', '));}else total+=6;
+ const score=Math.round(got/total*100);
+ const top=cand.skills.slice().sort((a,b)=>b[1]-a[1])[0];
+ const edge=top?`${cand.name.split(' ')[0]}'s strongest edge: ${top[1]} years of ${top[0]}${cand.certifications[0]?', backed by '+cand.certifications[0]:''}.`:'';
+ return {score,pros,cons,gaps,edge};
+}
+function bestScoreFor(cand){const j=jobById(cand.jobId);return j?matchScore(cand,j).score:0}
+
+/* ================= AUTH & SHELL ================= */
+let currentView='dashboard';
+function doLogin(){
+ const em=$('loginEmail').value.trim();
+ if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)){const e=$('loginErr');e.textContent='Please enter a valid email address.';e.style.display='block';return}
+ startApp({name:em.split('@')[0].replace(/[._]/g,' ').replace(/\b\w/g,m=>m.toUpperCase()),email:em});
+}
+function demoLogin(){startApp({name:'Jenny M.',email:'jenny@jenimcrich.com'})}
+function startApp(user){DB.user=user;saveDB();$('userName').textContent=user.name;$('userEmail').textContent=user.email;$('loginScreen').style.display='none';$('app').style.display='block';route('dashboard')}
+function logout(){DB.user=null;saveDB();location.reload()}
+
+const VIEWS=[
+ ['dashboard','📊','Dashboard'],['candidates','👥','Candidates'],['pipeline','🗂️','Pipeline'],
+ ['matchmaker','🎯','Matchmaker'],['jobs','💼','Jobs'],['calendar','📅','Calendar'],
+ ['templates','✉️','Templates'],['analytics','📈','Analytics'],['settings','⚙️','Settings']
+];
+function buildNav(){
+ $('navMenu').innerHTML=VIEWS.map(([k,ic,lbl])=>{
+  const badge=k==='dashboard'&&notifCount()>0?`<span class="nav-badge">${notifCount()}</span>`:'';
+  return `<button class="nav-item ${currentView===k?'active':''}" onclick="route('${k}')"><span class="nv-ic">${ic}</span>${lbl}${badge}</button>`;
+ }).join('');
+}
+function route(v,arg){
+ currentView=v;
+ const titles={dashboard:'Dashboard',candidates:'Candidates',pipeline:'Hiring Pipeline',matchmaker:'Candidate Matchmaker',jobs:'Job Listings',calendar:'Interview Calendar',templates:'Email Templates',analytics:'Analytics & Reports',settings:'Settings',candidate:'Candidate Profile',job:'Job Details'};
+ $('pageTitle').textContent=titles[v]||'';
+ buildNav();updateBell();
+ const fns={dashboard:vDashboard,candidates:vCandidates,pipeline:vPipeline,matchmaker:vMatchmaker,jobs:vJobs,calendar:vCalendar,templates:vTemplates,analytics:vAnalytics,settings:vSettings,candidate:()=>vCandidateDetail(arg),job:()=>vJobDetail(arg)};
+ (fns[v]||vDashboard)();
+ window.scrollTo(0,0);
+}
+
+/* ================= NOTIFICATIONS ================= */
+function stalledCands(){
+ if(!DB.settings.stalledEnabled)return[];
+ return DB.candidates.filter(c=>!c.archived&&!['Hired','Rejected'].includes(c.stage)&&daysIn(c.stageEnteredAt)>=DB.settings.stalledDays);
+}
+function todayInterviews(){
+ const today=new Date().toISOString().slice(0,10);const out=[];
+ DB.candidates.forEach(c=>c.interviews.forEach(iv=>{if(iv.date===today&&iv.status==='Scheduled')out.push({c,iv})}));
+ return out;
+}
+function upcomingInterviews(){
+ const today=new Date().toISOString().slice(0,10);const out=[];
+ DB.candidates.forEach(c=>c.interviews.forEach(iv=>{if(iv.date>=today&&iv.status==='Scheduled')out.push({c,iv})}));
+ return out.sort((a,b)=>(a.iv.date+a.iv.time).localeCompare(b.iv.date+b.iv.time));
+}
+function notifCount(){return stalledCands().length+todayInterviews().length}
+function updateBell(){const n=notifCount();const d=$('bellDot');d.style.display=n?'block':'none';d.textContent=n}
+function openNotifs(){
+ const st=stalledCands().sort((a,b)=>daysIn(b.stageEnteredAt)-daysIn(a.stageEnteredAt));
+ const ti=todayInterviews();
+ openModal(`<div class="modal-head"><h3>🔔 Notifications</h3><button class="x-btn" onclick="closeModal()">×</button></div>
+ <div class="modal-body">
+  ${ti.length?`<h3 class="sec">Interviews today</h3>`+ti.map(({c,iv})=>`<div class="note flex-between"><div><b>${esc(c.name)}</b> — ${iv.type} at ${iv.time} with ${esc(iv.interviewer)}</div><button class="btn btn-sm btn-ghost" onclick="closeModal();route('candidate','${c.id}')">Open profile</button></div>`).join(''):''}
+  <h3 class="sec mt12">Stalled candidates (no movement ≥ ${DB.settings.stalledDays} days)</h3>
+  ${st.length?st.map(c=>`<div class="note flex-between"><div><b>${esc(c.name)}</b> — ${daysIn(c.stageEnteredAt)} days in <span class="badge ${STAGE_BADGE[c.stage]}">${c.stage}</span></div>
+   <div class="flex"><button class="btn btn-sm btn-ghost" onclick="snooze('${c.id}')">Snooze 3d</button><button class="btn btn-sm btn-primary" onclick="closeModal();route('candidate','${c.id}')">Review</button></div></div>`).join(''):'<div class="empty">Nothing stalled. Pipeline is healthy ✓</div>'}
+ </div>
+ <div class="modal-foot"><button class="btn btn-ghost" onclick="closeModal()">Close</button></div>`);
+}
+function snooze(id){const c=candById(id);c.stageEnteredAt=daysAgo(DB.settings.stalledDays-3);logAct(c,'system','Stalled reminder snoozed for 3 days');saveDB();openNotifs();updateBell();buildNav()}
+
+/* ================= MODAL ================= */
+function openModal(html,wide){$('modalBox').className='modal'+(wide?' wide':'');$('modalBox').innerHTML=html;$('modalBg').classList.add('open')}
+function closeModal(){$('modalBg').classList.remove('open')}
+$('modalBg').addEventListener('click',e=>{if(e.target.id==='modalBg')closeModal()});
+</script>
+<script>
+/* ================= DASHBOARD ================= */
+function vDashboard(){
+ const active=DB.candidates.filter(c=>!c.archived&&!['Hired','Rejected'].includes(c.stage));
+ const hired=DB.candidates.filter(c=>c.stage==='Hired');
+ const openJobs=DB.jobs.filter(j=>j.status==='Open');
+ const tth=hired.length?Math.round(hired.reduce((a,c)=>a+daysIn(c.appliedAt),0)/hired.length):0;
+ const up=upcomingInterviews().slice(0,5);
+ const st=stalledCands();
+ $('content').innerHTML=`
+ ${todayInterviews().length?`<div class="card card-pad mb16" style="border-left:4px solid var(--purple-500)"><b>📅 Today:</b> ${todayInterviews().map(({c,iv})=>`${esc(c.name)} (${iv.type}, ${iv.time})`).join(' · ')} — <button class="link" onclick="route('calendar')">view calendar</button></div>`:''}
+ <div class="grid g-4 mb16">
+  <div class="card card-pad stat"><div class="lbl">Active Candidates</div><div class="val">${active.length}</div><div class="sub">${DB.candidates.filter(c=>c.flagged).length} flagged priority</div></div>
+  <div class="card card-pad stat"><div class="lbl">Open Roles</div><div class="val">${openJobs.length}</div><div class="sub">across ${[...new Set(openJobs.map(j=>j.client))].length} clients</div></div>
+  <div class="card card-pad stat"><div class="lbl">Avg Time-to-Hire</div><div class="val">${tth}d</div><div class="sub">${hired.length} hires to date</div></div>
+  <div class="card card-pad stat"><div class="lbl">Stalled</div><div class="val" style="color:${st.length?'var(--amber-500)':'var(--emerald-600)'}">${st.length}</div><div class="sub">≥ ${DB.settings.stalledDays} days without movement</div></div>
+ </div>
+ <div class="grid g-2">
+  <div class="card card-pad">
+   <div class="flex-between mb12"><h3 class="sec" style="margin:0">Pipeline snapshot</h3><button class="link" onclick="route('pipeline')">Open board →</button></div>
+   <canvas id="dashFunnel" height="190"></canvas>
+  </div>
+  <div class="card card-pad">
+   <h3 class="sec">Upcoming interviews</h3>
+   ${up.length?up.map(({c,iv})=>`<div class="note flex-between"><div><b class="link" onclick="route('candidate','${c.id}')">${esc(c.name)}</b><div class="small muted">${iv.type} · ${fmtD(iv.date)} ${iv.time} · ${esc(iv.interviewer)}</div></div><span class="badge ${STAGE_BADGE[c.stage]}">${c.stage}</span></div>`).join(''):'<div class="empty">No interviews scheduled</div>'}
+  </div>
+ </div>
+ <div class="card card-pad mt16">
+  <div class="flex-between mb12"><h3 class="sec" style="margin:0">Needs attention — stalled candidates</h3><span class="small muted">threshold ${DB.settings.stalledDays}d · <button class="link" onclick="route('settings')">configure</button></span></div>
+  ${st.length?`<table class="tbl"><tr><th>Candidate</th><th>Role</th><th>Stage</th><th>Days stuck</th><th></th></tr>${st.sort((a,b)=>daysIn(b.stageEnteredAt)-daysIn(a.stageEnteredAt)).map(c=>`<tr><td><b>${esc(c.name)}</b></td><td>${esc(jobById(c.jobId)?.title||'—')}</td><td><span class="badge ${STAGE_BADGE[c.stage]}">${c.stage}</span></td><td><b style="color:var(--amber-500)">${daysIn(c.stageEnteredAt)}d</b></td><td><button class="btn btn-sm btn-ghost" onclick="route('candidate','${c.id}')">Review</button></td></tr>`).join('')}</table>`:'<div class="empty">All candidates moving on schedule ✓</div>'}
+ </div>`;
+ const counts=STAGES.slice(0,5).map(s=>DB.candidates.filter(c=>!c.archived&&c.stage===s).length);
+ new Chart($('dashFunnel'),{type:'bar',data:{labels:STAGES.slice(0,5),datasets:[{data:counts,backgroundColor:['#94a3b8','#3b82f6','#8b5cf6','#f59e0b','#10b981'],borderRadius:6}]},options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{precision:0}}}}});
+}
+
+/* ================= CANDIDATES LIST ================= */
+let candSel=new Set(),candFilters={q:'',stages:new Set(),tags:new Set(),jobs:new Set(),flagged:false};
+function allTags(){return[...new Set(DB.candidates.flatMap(c=>c.tags))].sort()}
+function filteredCands(){
+ const f=candFilters,q=f.q.toLowerCase();
+ return DB.candidates.filter(c=>{
+  if(c.archived)return false;
+  if(f.flagged&&!c.flagged)return false;
+  if(f.stages.size&&!f.stages.has(c.stage))return false;
+  if(f.jobs.size&&!f.jobs.has(c.jobId))return false;
+  if(f.tags.size&&![...f.tags].some(t=>c.tags.includes(t)))return false;
+  if(q&&!(c.name.toLowerCase().includes(q)||c.resumeText.toLowerCase().includes(q)||c.skills.some(s=>s[0].toLowerCase().includes(q))))return false;
+  return true;
+ }).sort((a,b)=>bestScoreFor(b)-bestScoreFor(a));
+}
+function vCandidates(){
+ const list=filteredCands();
+ $('content').innerHTML=`
+ <div style="display:flex;gap:20px;align-items:flex-start">
+  <div class="filter-side card card-pad">
+   <div class="filter-group"><div class="fg-t">Search</div><input id="cq" placeholder="Name, skill, resume keyword…" value="${esc(candFilters.q)}" style="width:100%;padding:8px 10px;border:1px solid var(--slate-300);border-radius:8px" oninput="candFilters.q=this.value;refreshCandList()"></div>
+   <div class="filter-group"><div class="fg-t">Stage</div>${STAGES.map(s=>`<label class="fchk"><input type="checkbox" ${candFilters.stages.has(s)?'checked':''} onchange="togF('stages','${s}')">${s}</label>`).join('')}</div>
+   <div class="filter-group"><div class="fg-t">Role</div>${DB.jobs.map(j=>`<label class="fchk"><input type="checkbox" ${candFilters.jobs.has(j.id)?'checked':''} onchange="togF('jobs','${j.id}')">${esc(j.title.split('–')[0].trim())}</label>`).join('')}</div>
+   <div class="filter-group"><div class="fg-t">Tags</div>${allTags().map(t=>`<label class="fchk"><input type="checkbox" ${candFilters.tags.has(t)?'checked':''} onchange="togF('tags','${t}')">${esc(t)}</label>`).join('')||'<span class="small muted">No tags yet</span>'}</div>
+   <label class="fchk"><input type="checkbox" ${candFilters.flagged?'checked':''} onchange="candFilters.flagged=this.checked;refreshCandList()">⭐ Flagged only</label>
+   <button class="btn btn-ghost btn-sm btn-block mt12" onclick="candFilters={q:'',stages:new Set(),tags:new Set(),jobs:new Set(),flagged:false};vCandidates()">Clear filters</button>
+  </div>
+  <div style="flex:1;min-width:0">
+   <div class="bulkbar" id="bulkbar">
+    <b id="bulkCount"></b>
+    <select id="bulkStage" style="padding:6px;border-radius:6px;border:none"><option value="">Move to stage…</option>${STAGES.map(s=>`<option>${s}</option>`).join('')}</select>
+    <button class="btn btn-sm btn-primary" onclick="bulkMove()">Move</button>
+    <button class="btn btn-sm" style="background:var(--blue-500);color:#fff" onclick="bulkEmail()">✉️ Email</button>
+    <button class="btn btn-sm" style="background:var(--purple-500);color:#fff" onclick="bulkTag()">🏷 Tag</button>
+    <button class="btn btn-sm btn-danger" onclick="bulkArchive()">Archive</button>
+    <button class="btn btn-sm btn-ghost" style="color:#fff;border-color:var(--slate-600)" onclick="candSel.clear();refreshCandList()">Clear</button>
+   </div>
+   <div class="card" id="candTableWrap"></div>
+   <div class="flex-between mt12"><span class="small muted" id="candCount"></span>
+    <div class="flex"><button class="btn btn-ghost btn-sm" onclick="exportCandsCSV()">⬇ Export CSV</button><button class="btn btn-ghost btn-sm" onclick="openCompare()">⇄ Compare selected</button><button class="btn btn-primary btn-sm" onclick="openAddCandidate()">+ Add Candidate</button></div>
+   </div>
+  </div>
+ </div>`;
+ renderCandTable();
+}
+function togF(key,val){const s=candFilters[key];s.has(val)?s.delete(val):s.add(val);vCandidates()}
+function refreshCandList(){renderCandTable();const fSide=document.querySelector('.filter-side');}
+function renderCandTable(){
+ const list=filteredCands();
+ $('candTableWrap').innerHTML=`<table class="tbl">
+  <tr><th style="width:34px"><input type="checkbox" ${list.length&&list.every(c=>candSel.has(c.id))?'checked':''} onchange="toggleAll(this.checked)"></th>
+  <th></th><th>Candidate</th><th>Applied Role</th><th>Match</th><th>Stage</th><th>Source</th><th>Tags</th><th>In stage</th><th></th></tr>
+  ${list.map(c=>{const j=jobById(c.jobId),sc=bestScoreFor(c),stl=daysIn(c.stageEnteredAt)>=DB.settings.stalledDays&&!['Hired','Rejected'].includes(c.stage);
+   return `<tr class="${candSel.has(c.id)?'sel':''}">
+    <td><input type="checkbox" ${candSel.has(c.id)?'checked':''} onchange="togSel('${c.id}')"></td>
+    <td><button class="flag-btn ${c.flagged?'on':''}" onclick="togFlag('${c.id}')" title="Flag priority">⭐</button></td>
+    <td><b class="link" onclick="route('candidate','${c.id}')">${esc(c.name)}</b><div class="small muted">${esc(c.email)}</div></td>
+    <td class="small">${esc(j?.title||'—')}<div class="muted">${esc(j?.client||'')}</div></td>
+    <td><span class="score-pill ${scoreCls(sc)}">${sc}</span></td>
+    <td><span class="badge ${STAGE_BADGE[c.stage]}">${c.stage}</span></td>
+    <td class="small">${esc(c.source)}</td>
+    <td>${c.tags.map(t=>`<span class="badge b-purple tag-chip" onclick="togF('tags','${esc(t)}')">${esc(t)}</span>`).join(' ')}</td>
+    <td class="small" style="${stl?'color:var(--amber-500);font-weight:700':''}">${daysIn(c.stageEnteredAt)}d${stl?' ⚠':''}</td>
+    <td><button class="btn btn-sm btn-ghost" onclick="route('candidate','${c.id}')">Open</button></td></tr>`}).join('')||'<tr><td colspan="10"><div class="empty">No candidates match these filters</div></td></tr>'}
+ </table>`;
+ if($('candCount'))$('candCount').textContent=`${list.length} candidate${list.length!==1?'s':''} shown · sorted by match score`;
+ const bb=$('bulkbar');if(bb){bb.classList.toggle('show',candSel.size>0);if($('bulkCount'))$('bulkCount').textContent=candSel.size+' selected'}
+}
+function togSel(id){candSel.has(id)?candSel.delete(id):candSel.add(id);renderCandTable()}
+function toggleAll(on){const list=filteredCands();candSel=on?new Set(list.map(c=>c.id)):new Set();renderCandTable()}
+function togFlag(id){const c=candById(id);c.flagged=!c.flagged;logAct(c,'flag',c.flagged?'Flagged as priority':'Priority flag removed');saveDB();renderCandTable()}
+
+/* ---- Bulk actions ---- */
+function bulkMove(){
+ const stage=$('bulkStage').value;if(!stage)return toast('Choose a target stage first','warn');
+ confirmDlg(`Move <b>${candSel.size}</b> candidate(s) to <b>${stage}</b>?`,()=>{
+  candSel.forEach(id=>moveStage(candById(id),stage,true));
+  candSel.clear();saveDB();vCandidates();toast(`Moved to ${stage} ✓`);
+ });
+}
+function bulkArchive(){
+ confirmDlg(`Archive <b>${candSel.size}</b> candidate(s)? They will be hidden from active lists (data is kept).`,()=>{
+  candSel.forEach(id=>{const c=candById(id);c.archived=true;logAct(c,'system','Archived via bulk action')});
+  candSel.clear();saveDB();vCandidates();toast('Archived ✓');
+ });
+}
+function bulkTag(){
+ openModal(`<div class="modal-head"><h3>Tag ${candSel.size} candidate(s)</h3><button class="x-btn" onclick="closeModal()">×</button></div>
+ <div class="modal-body"><div class="field"><label>Tag</label><input id="tagInput" list="tagList" placeholder="e.g. Top Tier, Remote Ready"><datalist id="tagList">${allTags().map(t=>`<option value="${esc(t)}">`).join('')}</datalist></div></div>
+ <div class="modal-foot"><button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="applyBulkTag()">Apply tag</button></div>`);
+}
+function applyBulkTag(){
+ const t=$('tagInput').value.trim();if(!t)return;
+ candSel.forEach(id=>{const c=candById(id);if(!c.tags.includes(t)){c.tags.push(t);logAct(c,'tag','Tagged: '+t)}});
+ const n=candSel.size;saveDB();closeModal();
+ if(currentView==='candidate'){const id=[...candSel][0];candSel.clear();vCandidateDetail(id)}else vCandidates();
+ toast(`Tagged ${n} candidate(s) with "${esc(t)}"`);
+}
+function confirmDlg(html,onYes){
+ openModal(`<div class="modal-head"><h3>Please confirm</h3><button class="x-btn" onclick="closeModal()">×</button></div>
+ <div class="modal-body">${html}</div>
+ <div class="modal-foot"><button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-primary" id="confirmYes">Confirm</button></div>`);
+ $('confirmYes').onclick=()=>{closeModal();onYes()};
+}
+function moveStage(c,stage,silent){
+ if(c.stage===stage)return;
+ const old=c.stage;c.stage=stage;c.stageEnteredAt=new Date().toISOString();
+ logAct(c,'stage',`Stage changed: ${old} → ${stage}`);
+ if(stage==='Interview'&&!silent)setTimeout(()=>offerInterviewEmail(c),150);
+ saveDB();
+}
+function exportCandsCSV(){
+ const rows=[['Name','Email','Phone','Role','Client','Stage','Match Score','Source','Tags','Years Exp','Expected Salary','Notice Period','Days in Stage','Applied']];
+ filteredCands().forEach(c=>{const j=jobById(c.jobId);rows.push([c.name,c.email,c.phone,j?.title||'',j?.client||'',c.stage,bestScoreFor(c),c.source,c.tags.join('; '),c.yearsExp,c.expectedSalary,c.noticePeriod,daysIn(c.stageEnteredAt),fmtD(c.appliedAt)])});
+ downloadCSV(rows,'jenimcrich_candidates.csv');toast('CSV exported ⬇');
+}
+function downloadCSV(rows,name){
+ const csv=rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+ const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download=name;a.click();
+}
+function openAddCandidate(){
+ openModal(`<div class="modal-head"><h3>Add Candidate</h3><button class="x-btn" onclick="closeModal()">×</button></div>
+ <div class="modal-body">
+  <div class="grid g-2"><div class="field"><label>Full name *</label><input id="nc_name"></div><div class="field"><label>Email *</label><input id="nc_email"></div>
+  <div class="field"><label>Phone</label><input id="nc_phone"></div><div class="field"><label>Applying for *</label><select id="nc_job">${DB.jobs.map(j=>`<option value="${j.id}">${esc(j.title)}</option>`).join('')}</select></div>
+  <div class="field"><label>Source</label><select id="nc_src">${SOURCES.map(s=>`<option>${s}</option>`).join('')}</select></div><div class="field"><label>Years of experience</label><input id="nc_yrs" type="number" value="3"></div>
+  <div class="field"><label>Expected salary</label><input id="nc_sal" placeholder="₱90,000/mo"></div><div class="field"><label>Notice period</label><input id="nc_not" placeholder="30 days"></div></div>
+  <div class="field"><label>Skills (comma separated, "Skill:years")</label><input id="nc_skills" placeholder="Plant Operations:8, Safety Compliance:5"></div>
+  <div class="field"><label>Summary</label><textarea id="nc_sum" rows="3"></textarea></div>
+ </div>
+ <div class="modal-foot"><button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveNewCandidate()">Add candidate</button></div>`);
+}
+function saveNewCandidate(){
+ const name=$('nc_name').value.trim(),email=$('nc_email').value.trim();
+ if(!name||!email)return toast('Name and email are required','warn');
+ const skills=$('nc_skills').value.split(',').map(s=>s.trim()).filter(Boolean).map(s=>{const[n,y]=s.split(':');return[n.trim(),parseInt(y)||1]});
+ const c={id:uid(),name,email,phone:$('nc_phone').value,jobId:$('nc_job').value,stage:'Applied',source:$('nc_src').value,yearsExp:+$('nc_yrs').value||0,skills,certifications:[],summary:$('nc_sum').value,expectedSalary:$('nc_sal').value,noticePeriod:$('nc_not').value,resumeText:$('nc_sum').value+' '+skills.map(s=>s[0]).join(', '),tags:[],flagged:false,docs:[],notes:[],scorecards:[],interviews:[],activity:[],archived:false,appliedAt:new Date().toISOString(),stageEnteredAt:new Date().toISOString(),lastActivityAt:new Date().toISOString()};
+ logAct(c,'stage','Application created manually');
+ DB.candidates.unshift(c);saveDB();closeModal();vCandidates();toast('Candidate added ✓');
+}
+
+/* ---- Comparison view ---- */
+function openCompare(){
+ const ids=[...candSel].slice(0,3);
+ if(ids.length<2)return toast('Select 2–3 candidates (checkboxes) to compare','warn');
+ const cs=ids.map(candById);
+ openModal(`<div class="modal-head"><h3>Side-by-side comparison</h3><button class="x-btn" onclick="closeModal()">×</button></div>
+ <div class="modal-body"><div class="cmp-grid" style="grid-template-columns:repeat(${cs.length},1fr)">
+ ${cs.map(c=>{const j=jobById(c.jobId),m=j?matchScore(c,j):{score:0};const agg=aggScore(c);
+  return `<div class="card card-pad">
+   <b>${esc(c.name)}</b><div class="small muted mb8">${esc(j?.title||'')}</div>
+   <div class="mb8"><span class="score-pill ${scoreCls(m.score)}">${m.score}</span> <span class="small muted">match</span> ${agg?`&nbsp;<span class="score-pill s-high">${agg}★</span> <span class="small muted">interview avg</span>`:''}</div>
+   <div class="small"><b>Experience:</b> ${c.yearsExp} yrs</div>
+   <div class="small"><b>Expected:</b> ${esc(c.expectedSalary)}</div>
+   <div class="small"><b>Notice:</b> ${esc(c.noticePeriod)}</div>
+   <div class="small mt8"><b>Skills</b></div>${c.skills.map(s=>`<div class="small">· ${esc(s[0])} (${s[1]}y)</div>`).join('')}
+   <div class="small mt8"><b>Latest note</b><div class="muted">${esc(c.notes[0]?.text||'—')}</div></div>
+  </div>`}).join('')}
+ </div></div>
+ <div class="modal-foot"><button class="btn btn-ghost" onclick="closeModal()">Close</button></div>`,true);
+}
+function aggScore(c){
+ if(!c.scorecards.length)return 0;
+ let tw=0,ts=0;c.scorecards.forEach(sc=>SC_CATS.forEach(cat=>{const r=sc.ratings[cat.k];if(r){ts+=r*cat.w;tw+=cat.w}}));
+ return tw?(ts/tw).toFixed(1):0;
+}
+</script>
+<script>
+/* ================= CANDIDATE DETAIL ================= */
+let detailTab='overview',actFilter='';
+function vCandidateDetail(id){
+ const c=candById(id);if(!c){route('candidates');return}
+ const j=jobById(c.jobId),m=j?matchScore(c,j):null,agg=aggScore(c);
+ $('pageTitle').textContent=c.name;
+ $('content').innerHTML=`
+ <button class="link mb12" onclick="route('candidates')">← Back to candidates</button>
+ <div class="card card-pad mb16">
+  <div class="flex-between wrap">
+   <div class="flex">
+    <div style="width:54px;height:54px;border-radius:50%;background:var(--slate-800);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:19px">${c.name.split(' ').map(w=>w[0]).slice(0,2).join('')}</div>
+    <div>
+     <div class="flex"><h3 style="font-size:19px">${esc(c.name)}</h3><button class="flag-btn ${c.flagged?'on':''}" onclick="togFlag('${c.id}');vCandidateDetail('${c.id}')">⭐</button></div>
+     <div class="small muted">${esc(c.email)} · ${esc(c.phone)} · via ${esc(c.source)}</div>
+     <div class="mt8">${c.tags.map(t=>`<span class="badge b-purple">${esc(t)} <b style="cursor:pointer" onclick="rmTag('${c.id}','${esc(t)}')">×</b></span>`).join(' ')} <button class="link small" onclick="addTagOne('${c.id}')">+ tag</button></div>
+    </div>
+   </div>
+   <div style="text-align:right">
+    <div class="flex" style="justify-content:flex-end">${m?`<span class="score-pill ${scoreCls(m.score)}" style="font-size:17px;padding:6px 12px">${m.score}</span>`:''}${agg?`<span class="score-pill s-high" style="font-size:17px;padding:6px 12px">${agg}★</span>`:''}</div>
+    <div class="small muted mt8">match score${agg?' · interview avg':''}</div>
+    <div class="mt8 flex" style="justify-content:flex-end">
+     <select id="dStage" style="padding:7px;border-radius:8px;border:1px solid var(--slate-300)">${STAGES.map(s=>`<option ${c.stage===s?'selected':''}>${s}</option>`).join('')}</select>
+     <button class="btn btn-sm btn-primary" onclick="moveStage(candById('${c.id}'),$('dStage').value);vCandidateDetail('${c.id}')">Update stage</button>
+    </div>
+   </div>
+  </div>
+  <div class="grid g-4 mt16">
+   <div><div class="small muted">Applied role</div><b class="small">${esc(j?.title||'—')}</b><div class="small muted">${esc(j?.client||'')}</div></div>
+   <div><div class="small muted">Stage</div><span class="badge ${STAGE_BADGE[c.stage]}">${c.stage}</span> <span class="small muted">${daysIn(c.stageEnteredAt)}d</span></div>
+   <div><div class="small muted">Expected salary</div><b class="small">${esc(c.expectedSalary||'—')}</b></div>
+   <div><div class="small muted">Notice period</div><b class="small">${esc(c.noticePeriod||'—')}</b></div>
+  </div>
+ </div>
+ <div class="tabs">${['overview','notes','scorecards','documents','schedule','activity'].map(t=>`<button class="tab ${detailTab===t?'active':''}" onclick="detailTab='${t}';vCandidateDetail('${c.id}')">${t[0].toUpperCase()+t.slice(1)}${t==='notes'&&c.notes.length?` (${c.notes.length})`:''}${t==='scorecards'&&c.scorecards.length?` (${c.scorecards.length})`:''}</button>`).join('')}</div>
+ <div id="detailBody"></div>`;
+ ({overview:dOverview,notes:dNotes,scorecards:dScorecards,documents:dDocs,schedule:dSchedule,activity:dActivity})[detailTab](c,j,m);
+}
+function rmTag(id,t){const c=candById(id);c.tags=c.tags.filter(x=>x!==t);logAct(c,'tag','Removed tag: '+t);saveDB();vCandidateDetail(id)}
+function addTagOne(id){candSel=new Set([id]);bulkTag();const old=applyBulkTag;}
+
+function dOverview(c,j,m){
+ $('detailBody').innerHTML=`<div class="grid g-2">
+  <div class="card card-pad">
+   <h3 class="sec">Profile summary</h3><p class="small">${esc(c.summary)}</p>
+   <h3 class="sec mt16">Skills</h3>${c.skills.map(s=>`<span class="badge b-blue" style="margin:2px">${esc(s[0])} · ${s[1]}y</span>`).join(' ')}
+   <h3 class="sec mt16">Certifications</h3>${c.certifications.length?c.certifications.map(x=>`<span class="badge b-emerald" style="margin:2px">${esc(x)}</span>`).join(' '):'<span class="small muted">None on file</span>'}
+   <h3 class="sec mt16">Resume (parsed text)</h3><div class="note small" style="white-space:pre-wrap">${esc(c.resumeText)}</div>
+  </div>
+  <div>
+   ${m?`<div class="card card-pad match-card ${m.score>=80?'hi':m.score>=60?'md':'lo'} mb16">
+    <div class="flex-between"><h3 class="sec" style="margin:0">Match vs ${esc(j.title)}</h3><span class="score-pill ${scoreCls(m.score)}">${m.score}</span></div>
+    <div class="edge">⚡ ${esc(m.edge)}</div>
+    <div class="pc-grid"><div><b class="small">Pros</b><ul class="pc-list pros">${m.pros.map(p=>`<li>${esc(p)}</li>`).join('')}</ul></div>
+    <div><b class="small">Gaps</b><ul class="pc-list cons">${m.cons.map(p=>`<li>${esc(p)}</li>`).join('')||'<li style="padding-left:0">None identified</li>'}</ul></div></div>
+   </div>`:''}
+   <div class="card card-pad">
+    <h3 class="sec">Quick actions</h3>
+    <div class="flex wrap">
+     <button class="btn btn-sm btn-primary" onclick="candSel=new Set(['${c.id}']);bulkEmail()">✉️ Send email</button>
+     <button class="btn btn-sm btn-dark" onclick="offerLetter('${c.id}')">📄 Offer letter</button>
+     <button class="btn btn-sm btn-ghost" onclick="detailTab='schedule';vCandidateDetail('${c.id}')">📅 Schedule interview</button>
+     <button class="btn btn-sm btn-ghost" onclick="exportProfilePDF('${c.id}')">⬇ Print / PDF report</button>
+    </div>
+    <h3 class="sec mt16">Match against all open roles</h3>
+    ${DB.jobs.filter(x=>x.status==='Open').map(job=>{const mm=matchScore(c,job);return `<div class="flex-between" style="padding:6px 0;border-bottom:1px solid var(--slate-100)"><span class="small">${esc(job.title)}</span><span class="score-pill ${scoreCls(mm.score)}">${mm.score}</span></div>`}).join('')}
+   </div>
+  </div>
+ </div>`;
+}
+function exportProfilePDF(id){toast('Use your browser print dialog → Save as PDF');setTimeout(()=>window.print(),400)}
+
+/* ---- Notes ---- */
+const NOTE_CATS=['General','Screening','Interview Feedback','Client Feedback','Technical Assessment','Compensation'];
+function dNotes(c){
+ $('detailBody').innerHTML=`<div class="grid g-2" style="grid-template-columns:1.2fr .8fr">
+  <div class="card card-pad"><h3 class="sec">Notes & feedback <span class="small muted">(visible to hiring team only)</span></h3>
+   <input placeholder="Search notes…" style="width:100%;padding:8px 10px;border:1px solid var(--slate-300);border-radius:8px;margin-bottom:10px" oninput="filterNotes('${c.id}',this.value)">
+   <div id="notesList">${notesHTML(c,'')}</div>
+  </div>
+  <div class="card card-pad"><h3 class="sec">Add note</h3>
+   <div class="field"><label>Category</label><select id="noteCat">${NOTE_CATS.map(x=>`<option>${x}</option>`).join('')}</select></div>
+   <div class="field"><label>Note</label><textarea id="noteText" rows="5" placeholder="Interview observations, screening notes, follow-ups…"></textarea></div>
+   <button class="btn btn-primary" onclick="addNote('${c.id}')">Save note</button>
+  </div></div>`;
+}
+function notesHTML(c,q){
+ const list=c.notes.filter(n=>!q||n.text.toLowerCase().includes(q.toLowerCase()));
+ return list.map(n=>`<div class="note"><div class="flex-between"><span><span class="badge b-slate">${esc(n.cat)}</span> <b class="small">${esc(n.author)}</b></span><span class="small muted">${fmtDT(n.ts)}</span></div><p class="small mt8" style="white-space:pre-wrap">${esc(n.text)}</p></div>`).join('')||'<div class="empty">No notes yet</div>';
+}
+function filterNotes(id,q){$('notesList').innerHTML=notesHTML(candById(id),q)}
+function addNote(id){
+ const c=candById(id),t=$('noteText').value.trim();if(!t)return;
+ c.notes.unshift({id:uid(),author:DB.user.name,cat:$('noteCat').value,text:t,ts:new Date().toISOString()});
+ logAct(c,'note','Note added ('+$('noteCat').value+')');saveDB();dNotes(c);toast('Note saved ✓');
+}
+
+/* ---- Scorecards ---- */
+function dScorecards(c){
+ $('detailBody').innerHTML=`<div class="grid g-2" style="grid-template-columns:1.1fr .9fr">
+  <div>
+   ${c.scorecards.map(sc=>{const avg=(SC_CATS.reduce((a,cat)=>a+(sc.ratings[cat.k]||0)*cat.w,0)/SC_CATS.reduce((a,cat)=>a+(sc.ratings[cat.k]?cat.w:0),0)).toFixed(1);
+    return `<div class="card card-pad mb16"><div class="flex-between"><b>${esc(sc.interviewer)}</b><span class="small muted">${fmtD(sc.date)}</span></div>
+    <div class="mt8">${SC_CATS.map(cat=>`<div class="sc-row"><span class="small">${cat.k} <span class="muted">(w${cat.w})</span></span><span>${'★'.repeat(sc.ratings[cat.k]||0)}<span style="opacity:.25">${'★'.repeat(5-(sc.ratings[cat.k]||0))}</span></span></div>`).join('')}</div>
+    <div class="flex-between mt12"><span class="badge ${sc.rec==='Strong Hire'||sc.rec==='Hire'?'b-emerald':sc.rec==='Consider'?'b-amber':'b-red'}">${sc.rec}</span><b>Weighted avg: ${avg}</b></div>
+    <p class="small mt8 muted">${esc(sc.summary)}</p></div>`}).join('')||'<div class="card card-pad"><div class="empty">No scorecards submitted yet</div></div>'}
+  </div>
+  <div class="card card-pad"><h3 class="sec">New interview scorecard</h3>
+   <div class="field"><label>Interviewer</label><input id="scInt" value="${esc(DB.user.name)}"></div>
+   ${SC_CATS.map((cat,i)=>`<div class="sc-row"><span class="small">${cat.k}</span><span class="stars" data-cat="${cat.k}">${[1,2,3,4,5].map(n=>`<button onclick="setStar(this,${n})">★</button>`).join('')}</span></div>`).join('')}
+   <div class="field mt12"><label>Recommendation</label><select id="scRec"><option>Strong Hire</option><option>Hire</option><option>Consider</option><option>No Hire</option></select></div>
+   <div class="field"><label>Summary (required)</label><textarea id="scSum" rows="3"></textarea></div>
+   <button class="btn btn-primary" onclick="saveScorecard('${c.id}')">Submit scorecard</button>
+  </div></div>`;
+}
+function setStar(btn,n){const wrap=btn.parentElement;wrap.dataset.val=n;[...wrap.children].forEach((b,i)=>b.classList.toggle('on',i<n))}
+function saveScorecard(id){
+ const c=candById(id),sum=$('scSum').value.trim();
+ if(!sum)return toast('Summary is required for consistent feedback','warn');
+ const ratings={};document.querySelectorAll('.stars[data-cat]').forEach(w=>{if(w.dataset.val)ratings[w.dataset.cat]=+w.dataset.val});
+ if(!Object.keys(ratings).length)return toast('Rate at least one competency','warn');
+ c.scorecards.unshift({id:uid(),interviewer:$('scInt').value,date:new Date().toISOString(),ratings,summary:sum,rec:$('scRec').value});
+ logAct(c,'scorecard','Interview scorecard submitted by '+$('scInt').value+' ('+$('scRec').value+')');
+ saveDB();dScorecards(c);toast('Scorecard saved ✓');
+}
+
+/* ---- Documents ---- */
+function dDocs(c){
+ $('detailBody').innerHTML=`<div class="card card-pad">
+  <div class="flex-between mb12"><h3 class="sec" style="margin:0">Document storage</h3>
+   <div class="flex"><select id="docCat" style="padding:7px;border-radius:8px;border:1px solid var(--slate-300)"><option>Resume</option><option>Portfolio</option><option>Certification</option><option>Offer Letter</option><option>Other</option></select>
+   <button class="btn btn-sm btn-primary" onclick="uploadDoc('${c.id}')">＋ Upload file</button></div></div>
+  ${c.docs.length?`<table class="tbl"><tr><th>File</th><th>Category</th><th>Uploaded</th><th></th></tr>${c.docs.map((d,i)=>`<tr><td>📄 <b>${esc(d.name)}</b></td><td><span class="badge b-slate">${esc(d.cat)}</span></td><td class="small">${fmtD(d.date)}</td><td><button class="btn btn-sm btn-ghost" onclick="toast('Download simulated — files are stored in-demo only')">⬇</button> <button class="btn btn-sm btn-danger" onclick="rmDoc('${c.id}',${i})">✕</button></td></tr>`).join('')}</table>`:'<div class="empty">No documents uploaded</div>'}
+ </div>`;
+}
+function uploadDoc(id){
+ const fi=$('fileInput');fi.onchange=()=>{
+  if(fi.files[0]){const c=candById(id);c.docs.push({name:fi.files[0].name,cat:$('docCat').value,date:new Date().toISOString()});logAct(c,'doc','Document uploaded: '+fi.files[0].name);saveDB();dDocs(c);toast('Uploaded ✓ (linked to record)')}
+  fi.value='';
+ };fi.click();
+}
+function rmDoc(id,i){const c=candById(id);const d=c.docs.splice(i,1)[0];logAct(c,'doc','Document removed: '+d.name);saveDB();dDocs(c)}
+
+/* ---- Schedule ---- */
+function dSchedule(c){
+ const slots=['09:00','09:30','10:00','10:30','11:00','13:00','13:30','14:00','15:00','16:00'];
+ const taken=new Set();DB.candidates.forEach(x=>x.interviews.forEach(iv=>{if(iv.status==='Scheduled')taken.add(iv.date+'_'+iv.time)}));
+ $('detailBody').innerHTML=`<div class="grid g-2">
+  <div class="card card-pad"><h3 class="sec">Book an interview</h3>
+   <div class="grid g-2"><div class="field"><label>Date</label><input id="ivDate" type="date" value="${daysAhead(1)}" min="${daysAhead(0)}" onchange="dSchedRefresh('${c.id}')"></div>
+   <div class="field"><label>Type</label><select id="ivType"><option>HR Interview</option><option>Technical</option><option>Final Panel</option><option>Client Interview</option></select></div></div>
+   <div class="field"><label>Interviewer</label><select id="ivWho"><option>Jenny M.</option><option>R. Santos</option><option>C. dela Peña</option></select></div>
+   <div class="fg-t" style="font-size:11.5px;font-weight:700;text-transform:uppercase;color:var(--slate-500);margin-bottom:7px">Available slots <span class="muted" style="text-transform:none;font-weight:400">(booked slots are blocked to prevent double-booking)</span></div>
+   <div class="flex wrap" id="slotWrap">${slots.map(s=>`<button class="slot" data-t="${s}" onclick="bookSlot('${c.id}','${s}')">${s}</button>`).join('')}</div>
+  </div>
+  <div class="card card-pad"><h3 class="sec">Scheduled interviews</h3>
+   ${c.interviews.length?c.interviews.map(iv=>`<div class="note flex-between"><div><b>${iv.type}</b><div class="small muted">${fmtD(iv.date)} at ${iv.time} · ${esc(iv.interviewer)}</div></div>
+    <div class="flex"><span class="badge ${iv.status==='Scheduled'?'b-blue':iv.status==='Completed'?'b-emerald':'b-red'}">${iv.status}</span>${iv.status==='Scheduled'?`<button class="btn btn-sm btn-ghost" onclick="cancelIv('${c.id}','${iv.id}')">Cancel</button>`:''}</div></div>`).join(''):'<div class="empty">No interviews booked</div>'}
+   <p class="small muted mt12">Booking a slot blocks it on the team calendar and sends a confirmation to candidate + interviewer (simulated in demo).</p>
+  </div></div>`;
+ dSchedRefresh(c.id);
+}
+function dSchedRefresh(id){
+ const date=$('ivDate').value;const taken=new Set();
+ DB.candidates.forEach(x=>x.interviews.forEach(iv=>{if(iv.status==='Scheduled')taken.add(iv.date+'_'+iv.time)}));
+ document.querySelectorAll('#slotWrap .slot').forEach(b=>b.classList.toggle('taken',taken.has(date+'_'+b.dataset.t)));
+}
+function bookSlot(id,time){
+ const c=candById(id),date=$('ivDate').value,type=$('ivType').value,who=$('ivWho').value;
+ c.interviews.push({id:uid(),date,time,interviewer:who,type,status:'Scheduled'});
+ logAct(c,'interview',`${type} booked: ${fmtD(date)} ${time} with ${who} — confirmations sent to candidate & interviewer`);
+ DB.emailLog.unshift({ts:new Date().toISOString(),to:c.email,subject:'Interview Confirmation – '+type,candId:c.id,status:'Sent'});
+ saveDB();dSchedule(c);updateBell();buildNav();toast('Interview booked ✓ Calendar blocked & confirmations sent');
+}
+function cancelIv(cid,ivid){const c=candById(cid);const iv=c.interviews.find(x=>x.id===ivid);iv.status='Cancelled';logAct(c,'interview',iv.type+' cancelled');saveDB();dSchedule(c)}
+
+/* ---- Activity log ---- */
+function dActivity(c){
+ const types=[...new Set(c.activity.map(a=>a.type))];
+ $('detailBody').innerHTML=`<div class="card card-pad">
+  <div class="flex-between mb12"><h3 class="sec" style="margin:0">Activity timeline <span class="small muted">— every status change, note, email and update</span></h3>
+   <select onchange="actFilter=this.value;dActivity(candById('${c.id}'))" style="padding:7px;border-radius:8px;border:1px solid var(--slate-300)"><option value="">All types</option>${types.map(t=>`<option ${actFilter===t?'selected':''} value="${t}">${t}</option>`).join('')}</select></div>
+  <ul class="timeline">${c.activity.filter(a=>!actFilter||a.type===actFilter).map(a=>`<li><div class="small"><b>${esc(a.text)}</b></div><div class="small muted">${fmtDT(a.ts)} · ${esc(a.by)} · <span class="badge b-slate">${a.type}</span></div></li>`).join('')||'<div class="empty">No activity</div>'}</ul>
+ </div>`;
+}
+</script>
+<script>
+/* ================= KANBAN PIPELINE ================= */
+let dragId=null;
+function vPipeline(){
+ $('content').innerHTML=`
+ <div class="flex-between mb16"><div class="small muted">Drag candidate cards between stages — status updates automatically and is logged. Moving to <b>Interview</b> offers to send an invitation email. Amber edge = stalled ≥ ${DB.settings.stalledDays}d.</div>
+ <button class="btn btn-ghost btn-sm" onclick="route('candidates')">List view →</button></div>
+ <div class="kanban">${STAGES.map(s=>{
+  const cards=DB.candidates.filter(c=>!c.archived&&c.stage===s);
+  return `<div class="kcol" data-stage="${s}" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="dropCard(event,'${s}')">
+   <div class="kcol-head">${s}<span class="kcol-cnt">${cards.length}</span></div>
+   <div class="kcol-body">${cards.map(c=>{const j=jobById(c.jobId),sc=bestScoreFor(c),stl=daysIn(c.stageEnteredAt)>=DB.settings.stalledDays&&!['Hired','Rejected'].includes(s);
+    return `<div class="kcard ${stl?'stalled':''}" draggable="true" ondragstart="dragId='${c.id}'" onclick="route('candidate','${c.id}')">
+     <div class="flex-between"><span class="nm">${c.flagged?'⭐ ':''}${esc(c.name)}</span><span class="score-pill ${scoreCls(sc)}" style="min-width:34px;font-size:11px">${sc}</span></div>
+     <div class="rl">${esc(j?.title||'')}</div>
+     <div class="flex-between"><span class="small muted">${daysIn(c.stageEnteredAt)}d in stage</span>${stl?'<span class="small" style="color:var(--amber-500);font-weight:700">⚠ stalled</span>':''}</div>
+    </div>`}).join('')}</div></div>`}).join('')}
+ </div>`;
+}
+function dropCard(ev,stage){
+ ev.preventDefault();document.querySelectorAll('.kcol').forEach(k=>k.classList.remove('dragover'));
+ if(!dragId)return;const c=candById(dragId);dragId=null;
+ if(c.stage===stage)return;
+ moveStage(c,stage);vPipeline();updateBell();buildNav();
+ toast(`${esc(c.name)} → ${stage} (status updated & logged)`);
+}
+function offerInterviewEmail(c){
+ const t=DB.templates.find(t=>t.category==='Interview')||DB.templates[0];
+ openModal(`<div class="modal-head"><h3>⚡ Automation: send interview invitation?</h3><button class="x-btn" onclick="closeModal()">×</button></div>
+ <div class="modal-body">
+  <p class="small mb12">${esc(c.name)} just moved to <span class="badge b-purple">Interview</span>. Send the invitation template now?</p>
+  <div class="note small" style="white-space:pre-wrap"><b>Subject:</b> ${esc(merge(t.subject,c))}\n\n${esc(merge(t.body,c))}</div>
+ </div>
+ <div class="modal-foot"><button class="btn btn-ghost" onclick="closeModal()">Skip</button><button class="btn btn-primary" onclick="sendOne('${c.id}','${t.id}')">Send invitation</button></div>`);
+}
+function sendOne(cid,tid){
+ const c=candById(cid),t=DB.templates.find(x=>x.id===tid);
+ DB.emailLog.unshift({ts:new Date().toISOString(),to:c.email,subject:merge(t.subject,c),candId:c.id,status:'Sent'});
+ logAct(c,'email','Email sent: '+merge(t.subject,c));
+ saveDB();closeModal();toast('✉️ Email sent & logged to candidate history');
+}
+
+/* ================= MATCHMAKER ================= */
+const SAMPLE_RESUMES=[
+ {name:'Alex Miller',years:14,skills:[['Plant Operations',14],['Kiln Management',11],['Safety Compliance',9],['Team Leadership',10],['Budgeting',6]],certs:['ISO 45001 Lead Auditor','Six Sigma Black Belt'],summary:'Cement plant leader; ran a 3 MTPA integrated line with 220 staff, cut kiln downtime 18%.'},
+ {name:'Sarah Jenkins',years:8,skills:[['Reliability Engineering',8],['Predictive Maintenance',7],['SAP PM',5],['Root Cause Analysis',6],['Vibration Analysis',4]],certs:['CMRP'],summary:'Reliability engineer; built PdM program cutting unplanned downtime 31% at a nickel mine.'},
+ {name:'Marcus Thompson',years:7,skills:[['Quarry Operations',7],['Blasting',5],['Heavy Equipment',6],['Safety Compliance',4],['Production Planning',3]],certs:['Licensed Blaster (PNP-FED)'],summary:'Quarry supervisor; full drill-blast-crush ownership, crusher utilization to 87%.'},
+];
+function vMatchmaker(){
+ const openJobs=DB.jobs.filter(j=>j.status==='Open');
+ $('content').innerHTML=`
+ <div class="grid g-2" style="grid-template-columns:.9fr 1.1fr">
+  <div>
+   <div class="dropzone" id="dz" ondragover="event.preventDefault();this.classList.add('over')" ondragleave="this.classList.remove('over')" ondrop="event.preventDefault();this.classList.remove('over');mmUploadFile(event.dataTransfer.files[0])">
+    <div style="font-size:34px">📄</div>
+    <h3 class="mt8">Drop a resume here</h3>
+    <p class="muted small mt8">or</p>
+    <button class="btn btn-primary mt8" onclick="mmPick()">Browse files</button>
+    <p class="small muted mt12">PDF, DOC, TXT — parsed automatically (simulated extraction in demo)</p>
+   </div>
+   <div class="card card-pad mt16"><h3 class="sec">Or test with a sample resume</h3>
+    <div class="flex wrap">${SAMPLE_RESUMES.map((r,i)=>`<button class="btn btn-ghost btn-sm" onclick="runMatch(${i})">${esc(r.name)}</button>`).join('')}</div>
+    <p class="small muted mt8">Cross-references against <b>${openJobs.length} active JDs</b> with weighted skill scoring.</p>
+   </div>
+  </div>
+  <div id="mmRight"><div class="card card-pad"><div class="empty">Upload or pick a sample resume to see ranked matches against every open role — with pros, gaps and "the edge".</div></div></div>
+ </div>`;
+}
+function mmPick(){const fi=$('fileInput');fi.onchange=()=>{if(fi.files[0])mmUploadFile(fi.files[0]);fi.value=''};fi.click()}
+function mmUploadFile(file){
+ if(!file)return;
+ const r=SAMPLE_RESUMES[Math.floor(Math.random()*SAMPLE_RESUMES.length)];
+ runMatch(SAMPLE_RESUMES.indexOf(r),file.name);
+}
+function runMatch(idx,fname){
+ const r=SAMPLE_RESUMES[idx];
+ const openJobs=DB.jobs.filter(j=>j.status==='Open');
+ const stages=['Extracting text'+(fname?' from '+fname:'')+'…','Parsing skills & certifications…',`Cross-referencing ${openJobs.length} active JDs…`,'Analyzing skill gaps…','Ranking matches…'];
+ $('mmRight').innerHTML=`<div class="card card-pad"><h3 class="sec">Analyzing resume…</h3><ul class="stage-list" id="mmStages">${stages.map(s=>`<li><span class="dot">○</span> ${s}</li>`).join('')}</ul><div class="prog"><div id="mmProg"></div></div></div>`;
+ const lis=document.querySelectorAll('#mmStages li');
+ let i=0;
+ const step=()=>{
+  if(i>0){lis[i-1].classList.remove('act');lis[i-1].classList.add('done');lis[i-1].firstElementChild.textContent='✓'}
+  if(i<lis.length){lis[i].classList.add('act');lis[i].firstElementChild.outerHTML='<span class="spin"></span>';$('mmProg').style.width=((i+1)/lis.length*100)+'%';i++;setTimeout(step,520)}
+  else showMatches(r);
+ };step();
+}
+function showMatches(r){
+ const cand={name:r.name,skills:r.skills,yearsExp:r.years,certifications:r.certs};
+ const results=DB.jobs.filter(j=>j.status==='Open').map(j=>({j,m:matchScore(cand,j)})).sort((a,b)=>b.m.score-a.m.score);
+ $('mmRight').innerHTML=`
+ <div class="card card-pad mb16">
+  <div class="flex-between"><div><h3 class="sec" style="margin:0">${esc(r.name)}</h3><div class="small muted">${r.years} yrs experience · ${r.certs.join(', ')||'no certifications'}</div></div>
+  <button class="btn btn-sm btn-primary" onclick="addFromMatch(${SAMPLE_RESUMES.indexOf(r)})">+ Add to candidates</button></div>
+  <p class="small mt8">${esc(r.summary)}</p>
+  <div class="mt8">${r.skills.map(s=>`<span class="badge b-blue" style="margin:2px">${esc(s[0])} · ${s[1]}y</span>`).join('')}</div>
+ </div>
+ ${results.map(({j,m})=>`<div class="card card-pad mb16 match-card ${m.score>=80?'hi':m.score>=60?'md':'lo'}">
+  <div class="flex-between"><div><b>${esc(j.title)}</b><div class="small muted">${esc(j.client)} · ${esc(j.location)}</div></div><span class="score-pill ${scoreCls(m.score)}" style="font-size:16px;padding:5px 11px">${m.score}</span></div>
+  <div class="edge">⚡ <b>The Edge:</b> ${esc(m.edge)}</div>
+  <div class="pc-grid"><div><b class="small">Pros</b><ul class="pc-list pros">${m.pros.slice(0,4).map(p=>`<li>${esc(p)}</li>`).join('')}</ul></div>
+  <div><b class="small">Cons / Gaps</b><ul class="pc-list cons">${m.cons.slice(0,4).map(p=>`<li>${esc(p)}</li>`).join('')||'<li style="padding-left:0">None identified</li>'}</ul></div></div>
+  ${m.gaps.length?`<div class="small mt8"><b>Skill gaps:</b> ${m.gaps.map(g=>`<span class="badge b-red">${esc(g)}</span>`).join(' ')}</div>`:''}
+ </div>`).join('')}`;
+}
+function addFromMatch(idx){
+ const r=SAMPLE_RESUMES[idx];
+ const best=DB.jobs.filter(j=>j.status==='Open').map(j=>({j,s:matchScore({skills:r.skills,yearsExp:r.years,certifications:r.certs},j).score})).sort((a,b)=>b.s-a.s)[0];
+ const c={id:uid(),name:r.name+' (import)',email:r.name.toLowerCase().replace(/\s+/g,'.')+'@gmail.com',phone:'+63 9'+Math.floor(Math.random()*9e8+1e8),jobId:best.j.id,stage:'Applied',source:'Job Portal',yearsExp:r.years,skills:r.skills,certifications:r.certs,summary:r.summary,expectedSalary:'—',noticePeriod:'30 days',resumeText:r.summary+' Skills: '+r.skills.map(s=>s[0]).join(', '),tags:[],flagged:false,docs:[{name:r.name.replace(/\s+/g,'_')+'_Resume.pdf',cat:'Resume',date:new Date().toISOString()}],notes:[],scorecards:[],interviews:[],activity:[],archived:false,appliedAt:new Date().toISOString(),stageEnteredAt:new Date().toISOString(),lastActivityAt:new Date().toISOString()};
+ logAct(c,'stage','Imported via Matchmaker — auto-matched to '+best.j.title+' ('+best.s+')');
+ DB.candidates.unshift(c);saveDB();toast('Added to candidates → '+esc(best.j.title));
+}
+</script>
+<script>
+/* ================= JOBS ================= */
+function vJobs(){
+ $('content').innerHTML=`
+ <div class="flex-between mb16"><div class="small muted">${DB.jobs.filter(j=>j.status==='Open').length} open · ${DB.jobs.filter(j=>j.status==='On Hold').length} on hold · ${DB.jobs.filter(j=>j.status==='Closed').length} closed</div>
+ <button class="btn btn-primary" onclick="openAddJob()">+ Add Job Listing</button></div>
+ <div class="grid g-2">${DB.jobs.map(j=>{
+  const cands=DB.candidates.filter(c=>!c.archived&&c.jobId===j.id);
+  const active=cands.filter(c=>!['Hired','Rejected'].includes(c.stage));
+  return `<div class="card card-pad">
+   <div class="flex-between"><div><b style="font-size:15px">${esc(j.title)}</b><div class="small muted">${esc(j.client)} · ${esc(j.location)} · ${esc(j.salary)}</div></div>
+   <span class="badge ${j.status==='Open'?'b-emerald':j.status==='On Hold'?'b-amber':'b-slate'}">${j.status}</span></div>
+   <div class="flex mt12 small"><span><b>${cands.length}</b> applicants</span><span><b>${active.length}</b> active</span><span>open <b>${daysIn(j.openedAt)}d</b></span>${(j.hmNotes||[]).length?`<span>📝 <b>${j.hmNotes.length}</b> HM note${j.hmNotes.length>1?'s':''}</span>`:''}</div>
+   ${j.visa&&j.visa!=='Not specified'?`<div class="mt8"><span class="badge ${/TN|international|H-1B/i.test(j.visa)?'b-amber':'b-slate'}">🛂 ${esc(j.visa)}</span>${j.visaNotes?` <span class="small muted">${esc(j.visaNotes)}</span>`:''}</div>`:''}
+   <div class="mt8">${j.skills.map(([s,w])=>`<span class="badge b-blue" style="margin:2px">${esc(s)}${w>=3?' ★':''}</span>`).join('')}</div>
+   <div class="flex mt12">
+    <button class="btn btn-sm btn-primary" onclick="route('job','${j.id}')">Drill-down KPIs</button>
+    <select onchange="setJobStatus('${j.id}',this.value)" style="padding:6px;border-radius:8px;border:1px solid var(--slate-300)">${['Open','On Hold','Closed'].map(s=>`<option ${j.status===s?'selected':''}>${s}</option>`).join('')}</select>
+    <button class="btn btn-sm btn-danger" onclick="delJob('${j.id}')">Delete</button>
+   </div></div>`}).join('')}
+ </div>`;
+}
+function setJobStatus(id,s){jobById(id).status=s;saveDB();vJobs();toast('Job status → '+s)}
+function addJobNote(id){
+ const j=jobById(id),t=$('hmNoteText').value.trim();if(!t)return;
+ (j.hmNotes=j.hmNotes||[]).unshift({author:DB.user?.name||'Hiring Manager',text:t,ts:new Date().toISOString()});
+ saveDB();vJobDetail(id);toast('Hiring manager note added ✓');
+}
+function delJob(id){confirmDlg('Delete this job listing? Candidates remain but lose the role link.',()=>{DB.jobs=DB.jobs.filter(j=>j.id!==id);saveDB();vJobs();toast('Job deleted')})}
+const VISA_OPTIONS=['Not specified','US Citizens / Green Card only','TN Visa – Canadians only','TN Visa – Canadian or Mexican','H-1B transfer accepted','Open to international / sponsorship available','Local role (no visa requirement)'];
+function openAddJob(){
+ openModal(`<div class="modal-head"><h3>New Job Listing</h3><button class="x-btn" onclick="closeModal()">×</button></div>
+ <div class="modal-body">
+  <div class="note" style="background:var(--emerald-50);border-color:var(--emerald-100)">
+   <div class="flex-between"><b class="small">⚡ Auto-fill from a Job Description</b>
+    <div class="flex"><button class="btn btn-sm btn-ghost" onclick="jdUpload()">📄 Upload JD file</button><button class="btn btn-sm btn-primary" onclick="parseJD()">Auto-fill blanks</button></div></div>
+   <textarea id="nj_jd" rows="5" placeholder="…or paste the full job description text here, then click Auto-fill blanks. I'll extract the title, location, salary, years, skills, requirements and visa terms." style="width:100%;margin-top:8px;padding:8px;border:1px solid var(--slate-300);border-radius:8px"></textarea>
+   <div class="small muted mt8">Best results with .txt files or pasted text. PDF/Word: open the file, copy the text, paste above.</div>
+  </div>
+  <div class="grid g-2"><div class="field"><label>Title *</label><input id="nj_t" placeholder="Plant Manager – Cement"></div><div class="field"><label>Client *</label><input id="nj_c"></div>
+  <div class="field"><label>Location</label><input id="nj_l"></div><div class="field"><label>Salary range</label><input id="nj_s" placeholder="$100k–140k/yr"></div>
+  <div class="field"><label>Min years experience</label><input id="nj_y" type="number" value="5"></div><div class="field"><label>Status</label><select id="nj_st"><option>Open</option><option>On Hold</option></select></div></div>
+  <div class="grid g-2"><div class="field"><label>Work authorization / visa</label><select id="nj_v">${VISA_OPTIONS.map(v=>`<option>${v}</option>`).join('')}</select></div>
+  <div class="field"><label>Visa notes (optional)</label><input id="nj_vn" placeholder="e.g. TN renewable yearly; client won't sponsor H-1B"></div></div>
+  <div class="field"><label>Key skills ("Skill:weight 1-3", comma separated) *</label><input id="nj_sk" placeholder="Plant Operations:3, Safety Compliance:2"></div>
+  <div class="field"><label>Requirements (one per line)</label><textarea id="nj_r" rows="3"></textarea></div>
+  <div class="field"><label>Description</label><textarea id="nj_d" rows="2"></textarea></div>
+ </div>
+ <div class="modal-foot"><button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveNewJob()">Create listing</button></div>`);
+}
+function jdUpload(){
+ const fi=$('fileInput');fi.onchange=()=>{
+  const f=fi.files[0];fi.value='';if(!f)return;
+  if(/\.(txt|md|text)$/i.test(f.name)){
+   const rd=new FileReader();rd.onload=()=>{$('nj_jd').value=rd.result;parseJD();toast('JD loaded from '+esc(f.name)+' ✓')};rd.readAsText(f);
+  }else{toast('For '+esc(f.name)+': open it, copy the text, and paste it in the box (PDF/Word parsing needs the production backend)','warn')}
+ };fi.click();
+}
+function parseJD(){
+ const txt=$('nj_jd').value;if(!txt.trim())return toast('Paste or upload a job description first','warn');
+ const lines=txt.split('\n').map(l=>l.trim());
+ const grab=re=>{const m=txt.match(re);return m?m[1].trim().replace(/[.;,]+$/,''):''};
+ const set=(id,val)=>{if(val&&!$(id).value.trim())$(id).value=val};
+ // Title
+ let title=grab(/(?:job\s*title|position|role)\s*[:\-–]\s*(.+)/i);
+ if(!title){const fl=lines.find(l=>l&&l.length<70);if(fl)title=fl}
+ set('nj_t',title);
+ // Client / company / location / salary
+ set('nj_c',grab(/(?:company|client|employer)\s*[:\-–]\s*(.+)/i));
+ set('nj_l',grab(/(?:location|site|based in|work\s*site)\s*[:\-–]\s*(.+)/i));
+ let sal=grab(/(?:salary|compensation|pay|rate)\s*(?:range)?\s*[:\-–]\s*(.+)/i)||grab(/([\$₱€£]\s?[\d,.]+\s*[kK]?(?:\s*[-–—to]+\s*[\$₱€£]?\s?[\d,.]+\s*[kK]?)?(?:\s*(?:\/|per\s*)(?:yr|year|annum|mo|month|hr|hour))?)/);
+ set('nj_s',sal);
+ // Years
+ const ym=txt.match(/(\d{1,2})\s*\+?\s*(?:years?|yrs?)/i);if(ym)$('nj_y').value=ym[1];
+ // Visa / work authorization
+ const lo=txt.toLowerCase();let visa='';
+ if(/tn\s*(visa|status)/.test(lo))visa=/canadian(s)?\s*(citizens?\s*)?only/.test(lo)||(/canadian/.test(lo)&&!/mexican/.test(lo))?'TN Visa – Canadians only':'TN Visa – Canadian or Mexican';
+ else if(/green\s*card|us\s*citizens?\s*only|must\s*be\s*authorized\s*to\s*work\s*in\s*the\s*(us|u\.s)/.test(lo))visa='US Citizens / Green Card only';
+ else if(/h-?1b/.test(lo))visa='H-1B transfer accepted';
+ else if(/sponsorship\s*(is\s*)?available|open\s*to\s*international/.test(lo))visa='Open to international / sponsorship available';
+ if(visa)$('nj_v').value=visa;
+ const vline=lines.find(l=>/visa|sponsor|work\s*auth|citizen/i.test(l));
+ if(vline&&!$('nj_vn').value)$('nj_vn').value=vline.replace(/^[-•*]\s*/,'').slice(0,120);
+ // Requirements (bullet lines)
+ const reqs=lines.filter(l=>/^[-•*▪◦]\s+/.test(l)).map(l=>l.replace(/^[-•*▪◦]\s+/,'')).slice(0,8);
+ if(reqs.length&&!$('nj_r').value.trim())$('nj_r').value=reqs.join('\n');
+ // Skills — match against known skill dictionary + frequency weighting
+ const dict=[...new Set(DB.jobs.flatMap(j=>j.skills.map(s=>s[0])).concat(DB.candidates.flatMap(c=>c.skills.map(s=>s[0]))))];
+ const found=[];
+ dict.forEach(sk=>{const re=new RegExp(sk.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'gi');const n=(txt.match(re)||[]).length;if(n)found.push([sk,n>=2?3:2])});
+ // also catch Capitalized multiword phrases in requirements as candidate skills
+ reqs.join(' ').replace(/\b([A-Z][a-z]+(?:\s[A-Z][a-z]+){1,2})\b/g,(m,p)=>{if(!found.some(f=>f[0].toLowerCase()===p.toLowerCase())&&p.split(' ').length>1)found.push([p,1]);return m});
+ if(found.length&&!$('nj_sk').value.trim())$('nj_sk').value=found.slice(0,8).map(([s,w])=>s+':'+w).join(', ');
+ // Description = first paragraph
+ const para=txt.split(/\n\s*\n/).map(p=>p.trim()).find(p=>p.length>60&&!/^[-•*]/.test(p));
+ set('nj_d',(para||'').slice(0,300));
+ toast('Blanks auto-filled from JD — review & adjust before saving ✓');
+}
+function saveNewJob(){
+ const t=$('nj_t').value.trim(),c=$('nj_c').value.trim(),sk=$('nj_sk').value.trim();
+ if(!t||!c||!sk)return toast('Title, client and skills are required','warn');
+ DB.jobs.push({id:uid(),title:t,client:c,location:$('nj_l').value,salary:$('nj_s').value,minYears:+$('nj_y').value||0,status:$('nj_st').value,visa:$('nj_v').value,visaNotes:$('nj_vn').value.trim(),skills:sk.split(',').map(s=>{const[n,w]=s.split(':');return[n.trim(),Math.min(3,parseInt(w)||1)]}),reqs:$('nj_r').value.split('\n').filter(Boolean),desc:$('nj_d').value,jdText:$('nj_jd').value.trim(),hmNotes:[],openedAt:new Date().toISOString()});
+ saveDB();closeModal();vJobs();toast('Job listing created ✓');
+}
+function vJobDetail(id){
+ const j=jobById(id);if(!j){route('jobs');return}
+ $('pageTitle').textContent=j.title;
+ const cands=DB.candidates.filter(c=>!c.archived&&c.jobId===id);
+ const byStage=STAGES.map(s=>cands.filter(c=>c.stage===s).length);
+ const hired=cands.filter(c=>c.stage==='Hired');
+ const ttf=hired.length?Math.round(hired.reduce((a,c)=>a+daysIn(c.appliedAt),0)/hired.length):null;
+ const ivd=cands.filter(c=>['Interview','Offer','Hired'].includes(c.stage)).length;
+ const off=cands.filter(c=>['Offer','Hired'].includes(c.stage)).length;
+ const srcCount={};cands.forEach(c=>srcCount[c.source]=(srcCount[c.source]||0)+1);
+ $('content').innerHTML=`
+ <button class="link mb12" onclick="route('jobs')">← Back to jobs</button>
+ <div class="card card-pad mb16"><div class="flex-between"><div><b style="font-size:16px">${esc(j.title)}</b><div class="small muted">${esc(j.client)} · ${esc(j.location)} · ${esc(j.salary)} · opened ${fmtD(j.openedAt)}</div></div><span class="badge ${j.status==='Open'?'b-emerald':'b-amber'}">${j.status}</span></div>
+ ${j.visa&&j.visa!=='Not specified'?`<div class="mt8"><span class="badge ${/TN|international|H-1B/i.test(j.visa)?'b-amber':'b-slate'}">🛂 ${esc(j.visa)}</span>${j.visaNotes?` <span class="small muted">${esc(j.visaNotes)}</span>`:''}</div>`:''}
+ <p class="small mt8">${esc(j.desc)}</p>
+ <div class="small mt8"><b>Requirements:</b></div><ul class="pc-list pros">${j.reqs.map(r=>`<li>${esc(r)}</li>`).join('')}</ul></div>
+ <div class="card card-pad mb16">
+  <h3 class="sec">📝 Hiring manager notes <span class="small muted">— added as the search evolves; visible to the hiring team only</span></h3>
+  <div id="hmNotesList">${(j.hmNotes||[]).map(n=>`<div class="note"><div class="flex-between"><b class="small">${esc(n.author)}</b><span class="small muted">${fmtDT(n.ts)}</span></div><p class="small mt8" style="white-space:pre-wrap">${esc(n.text)}</p></div>`).join('')||'<div class="small muted mb8">No notes yet — e.g. "HM now prefers candidates with kiln experience" or "budget approved up to $150k".</div>'}</div>
+  <div class="flex mt8"><input id="hmNoteText" placeholder="Add a hiring manager note…" style="flex:1;padding:8px 10px;border:1px solid var(--slate-300);border-radius:8px" onkeydown="if(event.key==='Enter')addJobNote('${j.id}')"><button class="btn btn-sm btn-primary" onclick="addJobNote('${j.id}')">Add note</button></div>
+ </div>
+ <div class="grid g-4 mb16">
+  <div class="card card-pad stat"><div class="lbl">Total applicants</div><div class="val">${cands.length}</div></div>
+  <div class="card card-pad stat"><div class="lbl">Interview rate</div><div class="val">${cands.length?Math.round(ivd/cands.length*100):0}%</div><div class="sub">${ivd} reached interview</div></div>
+  <div class="card card-pad stat"><div class="lbl">Interview → Offer</div><div class="val">${ivd?Math.round(off/ivd*100):0}%</div><div class="sub">${off} offers extended</div></div>
+  <div class="card card-pad stat"><div class="lbl">Time-to-fill</div><div class="val">${ttf!==null?ttf+'d':'—'}</div><div class="sub">${hired.length?hired.length+' hired':'no hires yet'}</div></div>
+ </div>
+ <div class="grid g-2">
+  <div class="card card-pad"><h3 class="sec">Funnel by stage</h3><canvas id="jobFunnel" height="200"></canvas></div>
+  <div class="card card-pad"><h3 class="sec">Source effectiveness</h3><canvas id="jobSrc" height="200"></canvas></div>
+ </div>
+ <div class="card card-pad mt16"><h3 class="sec">Applicants (ranked by match)</h3>
+  <table class="tbl"><tr><th>Candidate</th><th>Match</th><th>Stage</th><th>In stage</th><th>Expected</th><th></th></tr>
+  ${cands.sort((a,b)=>matchScore(b,j).score-matchScore(a,j).score).map(c=>`<tr><td><b class="link" onclick="route('candidate','${c.id}')">${esc(c.name)}</b></td><td><span class="score-pill ${scoreCls(matchScore(c,j).score)}">${matchScore(c,j).score}</span></td><td><span class="badge ${STAGE_BADGE[c.stage]}">${c.stage}</span></td><td class="small">${daysIn(c.stageEnteredAt)}d</td><td class="small">${esc(c.expectedSalary)}</td><td><button class="btn btn-sm btn-ghost" onclick="route('candidate','${c.id}')">Open</button></td></tr>`).join('')}</table>
+ </div>`;
+ new Chart($('jobFunnel'),{type:'bar',data:{labels:STAGES,datasets:[{data:byStage,backgroundColor:['#94a3b8','#3b82f6','#8b5cf6','#f59e0b','#10b981','#ef4444'],borderRadius:6}]},options:{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{ticks:{precision:0}}}}});
+ new Chart($('jobSrc'),{type:'doughnut',data:{labels:Object.keys(srcCount),datasets:[{data:Object.values(srcCount),backgroundColor:['#10b981','#3b82f6','#f59e0b','#8b5cf6','#64748b']}]},options:{plugins:{legend:{position:'right'}}}});
+}
+
+/* ================= CALENDAR ================= */
+let calOffset=0;
+function vCalendar(){
+ const now=new Date();const view=new Date(now.getFullYear(),now.getMonth()+calOffset,1);
+ const y=view.getFullYear(),mo=view.getMonth();
+ const first=new Date(y,mo,1).getDay(),dim=new Date(y,mo+1,0).getDate();
+ const evs={};DB.candidates.forEach(c=>c.interviews.forEach(iv=>{if(iv.status==='Scheduled'){(evs[iv.date]=evs[iv.date]||[]).push({c,iv})}}));
+ let cells='';
+ for(let i=0;i<first;i++)cells+='<div class="cal-d dim"></div>';
+ for(let d=1;d<=dim;d++){
+  const ds=`${y}-${String(mo+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+  const today=ds===new Date().toISOString().slice(0,10);
+  cells+=`<div class="cal-d ${today?'today':''}"><span class="dn">${d}</span>${(evs[ds]||[]).sort((a,b)=>a.iv.time.localeCompare(b.iv.time)).map(({c,iv})=>`<div class="cal-ev" title="${esc(c.name)} – ${iv.type}" onclick="route('candidate','${c.id}')">${iv.time} ${esc(c.name.split(' ')[0])}</div>`).join('')}</div>`;
+ }
+ $('content').innerHTML=`
+ <div class="flex-between mb16">
+  <div class="flex"><button class="btn btn-ghost btn-sm" onclick="calOffset--;vCalendar()">←</button><b style="font-size:16px">${view.toLocaleString('en-US',{month:'long',year:'numeric'})}</b><button class="btn btn-ghost btn-sm" onclick="calOffset++;vCalendar()">→</button>${calOffset?`<button class="link" onclick="calOffset=0;vCalendar()">today</button>`:''}</div>
+  <span class="small muted">Pulled live from candidate records · booked via candidate → Schedule tab</span>
+ </div>
+ <div class="card" style="overflow:hidden"><div class="cal">
+  ${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d=>`<div class="cal-h">${d}</div>`).join('')}${cells}
+ </div></div>
+ <div class="card card-pad mt16"><h3 class="sec">Next up</h3>
+ ${upcomingInterviews().slice(0,8).map(({c,iv})=>`<div class="note flex-between"><div><b class="link" onclick="route('candidate','${c.id}')">${esc(c.name)}</b> — ${iv.type}<div class="small muted">${fmtD(iv.date)} ${iv.time} · ${esc(iv.interviewer)} · reminder fires 1 hr before (in-app)</div></div><span class="badge ${STAGE_BADGE[c.stage]}">${c.stage}</span></div>`).join('')||'<div class="empty">No upcoming interviews</div>'}
+ </div>`;
+}
+
+/* ================= TEMPLATES & EMAIL ================= */
+function merge(text,c){
+ const j=jobById(c.jobId);
+ return text.replace(/{{candidate_name}}/g,c.name).replace(/{{job_title}}/g,j?.title||'the role').replace(/{{client}}/g,j?.client||'our client').replace(/{{recruiter_name}}/g,DB.user?.name||'Recruiter').replace(/{{stage}}/g,c.stage).replace(/{{interview_date}}/g,c.interviews.find(iv=>iv.status==='Scheduled')?fmtD(c.interviews.find(iv=>iv.status==='Scheduled').date):'(to be scheduled)');
+}
+function vTemplates(){
+ $('content').innerHTML=`
+ <div class="flex-between mb16"><div class="small muted">Merge fields: <code>{{candidate_name}} {{job_title}} {{client}} {{recruiter_name}} {{stage}} {{interview_date}}</code></div>
+ <button class="btn btn-primary" onclick="editTemplate()">+ New Template</button></div>
+ <div class="grid g-2">${DB.templates.map(t=>`<div class="card card-pad">
+  <div class="flex-between"><b>${esc(t.name)}</b><span class="badge ${t.category==='Offer'?'b-amber':t.category==='Rejection'?'b-red':t.category==='Interview'?'b-purple':'b-blue'}">${esc(t.category)}</span></div>
+  <div class="small muted mt8"><b>Subject:</b> ${esc(t.subject)}</div>
+  <div class="note small mt8" style="white-space:pre-wrap;max-height:130px;overflow:hidden">${esc(t.body)}</div>
+  <div class="flex mt8"><button class="btn btn-sm btn-ghost" onclick="editTemplate('${t.id}')">Edit</button><button class="btn btn-sm btn-danger" onclick="delTemplate('${t.id}')">Delete</button></div>
+ </div>`).join('')}</div>
+ <div class="card card-pad mt16"><h3 class="sec">Sent email log (${DB.emailLog.length})</h3>
+ ${DB.emailLog.length?`<table class="tbl"><tr><th>When</th><th>To</th><th>Subject</th><th>Status</th></tr>${DB.emailLog.slice(0,15).map(e=>`<tr><td class="small">${fmtDT(e.ts)}</td><td class="small">${esc(e.to)}</td><td class="small">${esc(e.subject)}</td><td><span class="badge b-emerald">${e.status}</span></td></tr>`).join('')}</table>`:'<div class="empty">No emails sent yet — select candidates and use bulk email</div>'}
+ </div>`;
+}
+function editTemplate(id){
+ const t=id?DB.templates.find(x=>x.id===id):{name:'',category:'Update',subject:'',body:''};
+ openModal(`<div class="modal-head"><h3>${id?'Edit':'New'} template</h3><button class="x-btn" onclick="closeModal()">×</button></div>
+ <div class="modal-body">
+  <div class="grid g-2"><div class="field"><label>Name</label><input id="tp_n" value="${esc(t.name)}"></div>
+  <div class="field"><label>Category</label><select id="tp_c">${['Interview','Rejection','Offer','Update','Outreach'].map(x=>`<option ${t.category===x?'selected':''}>${x}</option>`).join('')}</select></div></div>
+  <div class="field"><label>Subject</label><input id="tp_s" value="${esc(t.subject)}"></div>
+  <div class="field"><label>Body</label><textarea id="tp_b" rows="8">${esc(t.body)}</textarea></div>
+ </div>
+ <div class="modal-foot"><button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveTemplate('${id||''}')">Save</button></div>`);
+}
+function saveTemplate(id){
+ const n=$('tp_n').value.trim();if(!n)return toast('Name required','warn');
+ const data={name:n,category:$('tp_c').value,subject:$('tp_s').value,body:$('tp_b').value};
+ if(id)Object.assign(DB.templates.find(x=>x.id===id),data);else DB.templates.push({id:uid(),...data});
+ saveDB();closeModal();vTemplates();toast('Template saved ✓');
+}
+function delTemplate(id){confirmDlg('Delete this template?',()=>{DB.templates=DB.templates.filter(t=>t.id!==id);saveDB();vTemplates()})}
+
+/* ---- Bulk email with per-recipient preview ---- */
+let bulkRecipients=[];
+function bulkEmail(){
+ if(!candSel.size)return toast('Select candidates first','warn');
+ bulkRecipients=[...candSel];
+ openModal(`<div class="modal-head"><h3>✉️ Send email to ${bulkRecipients.length} candidate(s)</h3><button class="x-btn" onclick="closeModal()">×</button></div>
+ <div class="modal-body">
+  <div class="field"><label>Template</label><select id="be_t" onchange="bePreview()">${DB.templates.map(t=>`<option value="${t.id}">${esc(t.name)} (${t.category})</option>`).join('')}</select></div>
+  <h3 class="sec">Per-recipient preview <span class="small muted">— review, edit list, then confirm</span></h3>
+  <div id="bePrev"></div>
+ </div>
+ <div class="modal-foot"><button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-primary" id="beSend" onclick="beConfirm()">Review & send</button></div>`,true);
+ bePreview();
+}
+function bePreview(){
+ const t=DB.templates.find(x=>x.id===$('be_t').value);
+ $('bePrev').innerHTML=bulkRecipients.map(id=>{const c=candById(id);
+  return `<div class="note"><div class="flex-between"><b class="small">${esc(c.name)} &lt;${esc(c.email)}&gt;</b><button class="link small" onclick="beRemove('${id}')">remove</button></div>
+  <div class="small mt8"><b>${esc(merge(t.subject,c))}</b></div>
+  <div class="small muted mt8" style="white-space:pre-wrap;max-height:110px;overflow:auto">${esc(merge(t.body,c))}</div></div>`}).join('')||'<div class="empty">All recipients removed</div>';
+ $('beSend').textContent=`Send ${bulkRecipients.length} email(s)`;
+}
+function beRemove(id){bulkRecipients=bulkRecipients.filter(x=>x!==id);bePreview()}
+function beConfirm(){
+ if(!bulkRecipients.length)return;
+ const t=DB.templates.find(x=>x.id===$('be_t').value);
+ const n=bulkRecipients.length;
+ if(n>=10&&!confirm(`You are about to send ${n} emails. Continue?`))return;
+ bulkRecipients.forEach(id=>{const c=candById(id);
+  DB.emailLog.unshift({ts:new Date().toISOString(),to:c.email,subject:merge(t.subject,c),candId:c.id,status:'Sent'});
+  logAct(c,'email','Email sent: '+merge(t.subject,c));
+ });
+ saveDB();closeModal();candSel.clear();
+ if(currentView==='candidates')vCandidates();
+ toast(`✉️ ${n} personalized email(s) sent & logged (simulated in demo)`);
+}
+
+/* ---- Offer letter generator ---- */
+function offerLetter(id){
+ const c=candById(id),j=jobById(c.jobId);
+ const body=`Dear ${c.name},\n\nOn behalf of ${j?.client||'our client'}, JeniMcRich Recruitment is pleased to extend an offer for the position of:\n\n  ${j?.title||''}\n  Location: ${j?.location||''}\n  Compensation: ${c.expectedSalary||j?.salary||'as discussed'}\n  Start date: subject to your ${c.noticePeriod||'30 day'} notice period\n\nThis offer is contingent on reference checks and pre-employment requirements.\n\nPlease confirm acceptance within 5 business days.\n\nSincerely,\n${DB.user.name}\nJeniMcRich Recruitment`;
+ openModal(`<div class="modal-head"><h3>📄 Offer letter — ${esc(c.name)}</h3><button class="x-btn" onclick="closeModal()">×</button></div>
+ <div class="modal-body"><div class="field"><label>Preview & edit before sending</label><textarea id="olBody" rows="16" style="font-family:Georgia,serif">${esc(body)}</textarea></div></div>
+ <div class="modal-foot"><button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="sendOffer('${c.id}')">Send offer</button></div>`);
+}
+function sendOffer(id){
+ const c=candById(id),j=jobById(c.jobId);
+ DB.emailLog.unshift({ts:new Date().toISOString(),to:c.email,subject:'Offer of Employment – '+(j?.title||''),candId:c.id,status:'Sent'});
+ c.docs.push({name:'Offer_Letter_'+c.name.replace(/\s+/g,'_')+'.pdf',cat:'Offer Letter',date:new Date().toISOString()});
+ logAct(c,'email','Offer letter sent');
+ if(!['Offer','Hired'].includes(c.stage))moveStage(c,'Offer',true);
+ saveDB();closeModal();vCandidateDetail(id);toast('Offer sent, archived to documents & stage → Offer ✓');
+}
+</script>
+<script>
+/* ================= ANALYTICS ================= */
+function vAnalytics(){
+ const all=DB.candidates.filter(c=>!c.archived);
+ const reached=s=>{const idx=STAGES.indexOf(s);return all.filter(c=>{const ci=STAGES.indexOf(c.stage);return c.stage!=='Rejected'&&ci>=idx||(c.stage==='Rejected'&&idx===0)}).length};
+ const funnel=['Applied','Screening','Interview','Offer','Hired'].map(s=>reached(s));
+ const conv=funnel.map((v,i)=>i===0?100:funnel[i-1]?Math.round(v/funnel[i-1]*100):0);
+ const srcQ={};SOURCES.forEach(s=>{const cs=all.filter(c=>c.source===s);srcQ[s]={n:cs.length,q:cs.filter(c=>['Interview','Offer','Hired'].includes(c.stage)).length}});
+ const hired=all.filter(c=>c.stage==='Hired');
+ const tth=hired.length?Math.round(hired.reduce((a,c)=>a+daysIn(c.appliedAt),0)/hired.length):0;
+ const offers=all.filter(c=>['Offer','Hired'].includes(c.stage)).length;
+ const stageAvg=STAGES.slice(0,4).map(s=>{const cs=all.filter(c=>c.stage===s);return cs.length?Math.round(cs.reduce((a,c)=>a+daysIn(c.stageEnteredAt),0)/cs.length):0});
+ $('content').innerHTML=`
+ <div class="flex-between mb16"><div class="small muted">Live metrics computed from your pipeline data</div>
+  <div class="flex"><button class="btn btn-ghost btn-sm" onclick="exportMetricsCSV()">⬇ Export data (CSV)</button><button class="btn btn-ghost btn-sm" onclick="toast('Use browser print → Save as PDF');setTimeout(()=>window.print(),400)">⬇ Export report (PDF)</button></div></div>
+ <div class="grid g-4 mb16">
+  <div class="card card-pad stat"><div class="lbl">Total candidates</div><div class="val">${all.length}</div></div>
+  <div class="card card-pad stat"><div class="lbl">Avg time-to-hire</div><div class="val">${tth}d</div></div>
+  <div class="card card-pad stat"><div class="lbl">Offer acceptance</div><div class="val">${offers?Math.round(hired.length/offers*100):0}%</div><div class="sub">${hired.length}/${offers} offers accepted</div></div>
+  <div class="card card-pad stat"><div class="lbl">Interview → Offer</div><div class="val">${funnel[2]?Math.round(funnel[3]/funnel[2]*100):0}%</div></div>
+ </div>
+ <div class="grid g-2 mb16">
+  <div class="card card-pad"><h3 class="sec">Hiring funnel — where we lose candidates</h3><canvas id="anFunnel" height="210"></canvas>
+   <div class="small muted mt8">${conv.slice(1).map((c,i)=>`${['Applied→Screening','Screening→Interview','Interview→Offer','Offer→Hired'][i]}: <b>${c}%</b>`).join(' · ')}</div></div>
+  <div class="card card-pad"><h3 class="sec">Source effectiveness (qualified = reached interview+)</h3><canvas id="anSrc" height="210"></canvas></div>
+ </div>
+ <div class="grid g-2">
+  <div class="card card-pad"><h3 class="sec">Average days in current stage</h3><canvas id="anStage" height="200"></canvas></div>
+  <div class="card card-pad"><h3 class="sec">Recruiter activity (last 30 days)</h3>
+   <table class="tbl"><tr><th>Metric</th><th>Count</th></tr>
+   <tr><td>Emails sent</td><td><b>${DB.emailLog.length}</b></td></tr>
+   <tr><td>Notes logged</td><td><b>${all.reduce((a,c)=>a+c.notes.length,0)}</b></td></tr>
+   <tr><td>Scorecards submitted</td><td><b>${all.reduce((a,c)=>a+c.scorecards.length,0)}</b></td></tr>
+   <tr><td>Interviews scheduled</td><td><b>${all.reduce((a,c)=>a+c.interviews.length,0)}</b></td></tr>
+   <tr><td>Stalled candidates right now</td><td><b style="color:var(--amber-500)">${stalledCands().length}</b></td></tr></table>
+  </div>
+ </div>`;
+ new Chart($('anFunnel'),{type:'bar',data:{labels:['Applied','Screening','Interview','Offer','Hired'],datasets:[{data:funnel,backgroundColor:['#94a3b8','#3b82f6','#8b5cf6','#f59e0b','#10b981'],borderRadius:6}]},options:{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{ticks:{precision:0}}}}});
+ new Chart($('anSrc'),{type:'bar',data:{labels:Object.keys(srcQ),datasets:[{label:'Total',data:Object.values(srcQ).map(x=>x.n),backgroundColor:'#cbd5e1',borderRadius:5},{label:'Qualified',data:Object.values(srcQ).map(x=>x.q),backgroundColor:'#10b981',borderRadius:5}]},options:{scales:{y:{beginAtZero:true,ticks:{precision:0}}}}});
+ new Chart($('anStage'),{type:'bar',data:{labels:STAGES.slice(0,4),datasets:[{data:stageAvg,backgroundColor:'#3b82f6',borderRadius:6}]},options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,title:{display:true,text:'days'}}}}});
+}
+function exportMetricsCSV(){
+ const all=DB.candidates.filter(c=>!c.archived);
+ const rows=[['Stage','Count']];STAGES.forEach(s=>rows.push([s,all.filter(c=>c.stage===s).length]));
+ rows.push([],['Source','Total','Qualified']);SOURCES.forEach(s=>{const cs=all.filter(c=>c.source===s);rows.push([s,cs.length,cs.filter(c=>['Interview','Offer','Hired'].includes(c.stage)).length])});
+ downloadCSV(rows,'jenimcrich_metrics.csv');toast('Metrics exported ⬇');
+}
+
+/* ================= SETTINGS ================= */
+function vSettings(){
+ $('content').innerHTML=`
+ <div class="grid g-2">
+  <div class="card card-pad">
+   <h3 class="sec">Stalled-candidate reminders</h3>
+   <label class="fchk"><input type="checkbox" ${DB.settings.stalledEnabled?'checked':''} onchange="DB.settings.stalledEnabled=this.checked;saveDB();buildNav();updateBell();toast('Reminders '+(this.checked?'enabled':'disabled'))"> Enable inactivity alerts</label>
+   <div class="field mt12"><label>Inactivity threshold</label>
+    <select onchange="DB.settings.stalledDays=+this.value;saveDB();buildNav();updateBell();toast('Threshold set to '+this.value+' days')">${[3,5,7,10].map(d=>`<option value="${d}" ${DB.settings.stalledDays===d?'selected':''}>${d} days</option>`).join('')}</select></div>
+   <p class="small muted">Candidates with no stage movement, notes, or emails within the threshold appear in 🔔 notifications and on the dashboard.</p>
+  </div>
+  <div class="card card-pad">
+   <h3 class="sec">Roles & permissions <span class="badge b-slate">demo preview</span></h3>
+   <table class="tbl"><tr><th>Capability</th><th>Hiring Manager</th><th>Recruiter</th></tr>
+   <tr><td>Edit job details</td><td>✅</td><td>—</td></tr>
+   <tr><td>View & move candidate cards</td><td>✅</td><td>✅</td></tr>
+   <tr><td>Send bulk email</td><td>✅</td><td>✅</td></tr>
+   <tr><td>Delete job listings</td><td>✅</td><td>—</td></tr></table>
+   <p class="small muted mt8">Full enforcement requires a backend with real user accounts — flagged for the production roadmap.</p>
+  </div>
+  <div class="card card-pad">
+   <h3 class="sec">Data</h3>
+   <p class="small muted mb12">All demo data is stored locally in your browser. Nothing is sent to a server.</p>
+   <button class="btn btn-danger btn-sm" onclick="confirmDlg('Reset all demo data back to the original seed?',resetDB)">Reset demo data</button>
+  </div>
+  <div class="card card-pad">
+   <h3 class="sec">Production roadmap (next steps)</h3>
+   <ul class="pc-list pros">
+    <li>Real backend (Supabase/Firebase): auth, multi-user, file storage</li>
+    <li>Real email via Resend/SendGrid + calendar sync (Google API)</li>
+    <li>Actual resume parsing (PDF text extraction + LLM)</li>
+    <li>Public job portal feeding the pipeline</li>
+    <li>E-signature for offers (DocuSign/Dropbox Sign)</li>
+   </ul>
+  </div>
+ </div>`;
+}
+
+/* ================= BOOT ================= */
+loadDB();
+if(DB.user){$('userName').textContent=DB.user.name;$('userEmail').textContent=DB.user.email;$('loginScreen').style.display='none';$('app').style.display='block';route('dashboard')}
+</script>
+</body>
+</html>
