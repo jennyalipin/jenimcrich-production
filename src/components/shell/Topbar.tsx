@@ -4,6 +4,16 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode, RefObject } from "react";
+import { Icon } from "@/components/ui";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { signOut } from "@/app/(auth)/login/actions";
 import { CommandPalette } from "./CommandPalette";
 
 /**
@@ -214,89 +224,65 @@ function NotificationsBell() {
 
 const DEMO_USER = {
   name: "Jenny M",
-  email: "jenny@jenimcrich.com",
+  email: "jennyalipin06@gmail.com",
   role: "Admin",
 } as const;
 
 function UserMenu() {
-  const { open, setOpen, ref } = useDropdown();
-
   return (
-    <div ref={ref} className="relative">
-      <button
-        type="button"
-        aria-label={`User menu — ${DEMO_USER.name}, ${DEMO_USER.role}`}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        onClick={() => setOpen(!open)}
-        className="flex h-9 items-center gap-2 rounded-lg px-1 outline-none transition-colors hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-emerald-400 lg:pr-2"
-      >
-        <span className="grid h-7 w-7 place-items-center rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 text-[11px] font-bold text-white">
-          JM
-        </span>
-        <span className="hidden text-left lg:block">
-          <span className="block text-[12.5px] font-semibold leading-tight text-white">
-            {DEMO_USER.name}
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          aria-label={`User menu — ${DEMO_USER.name}, ${DEMO_USER.role}`}
+          className="flex h-9 items-center gap-2 rounded-lg px-1 outline-none transition-colors hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-emerald-400 lg:pr-2"
+        >
+          <span className="grid h-7 w-7 place-items-center rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 text-[11px] font-bold text-white">
+            JM
           </span>
-          <span className="block text-[10.5px] leading-tight text-slate-400">
-            {DEMO_USER.role}
+          <span className="hidden text-left lg:block">
+            <span className="block text-[12.5px] font-semibold leading-tight text-white">
+              {DEMO_USER.name}
+            </span>
+            <span className="block text-[10.5px] leading-tight text-slate-400">
+              {DEMO_USER.role}
+            </span>
           </span>
-        </span>
-        <TopSvg className="hidden h-3.5 w-3.5 text-slate-400 lg:block">
-          <path d="m6 9 6 6 6-6" />
-        </TopSvg>
-      </button>
-
-      {open && (
-        <div className={`${POPOVER_CLASSES} w-60`} role="menu">
-          <div className="border-b border-slate-100 px-4 py-3">
-            <div className="flex items-center justify-between gap-2">
-              <span className="truncate text-[13.5px] font-semibold text-slate-900">
-                {DEMO_USER.name}
-              </span>
-              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide text-emerald-700">
-                {DEMO_USER.role}
-              </span>
-            </div>
-            <span className="block truncate text-[12px] text-slate-500">{DEMO_USER.email}</span>
-          </div>
-          <div className="py-1">
-            <Link
-              href="/settings"
-              role="menuitem"
-              onClick={() => setOpen(false)}
-              className="flex items-center gap-2.5 px-4 py-2 text-[13px] font-medium text-slate-700 outline-none transition-colors hover:bg-slate-50 focus-visible:bg-slate-50"
-            >
-              <TopSvg className="h-4 w-4 text-slate-400">
-                <line x1="21" x2="14" y1="5" y2="5" />
-                <line x1="10" x2="3" y1="5" y2="5" />
-                <line x1="21" x2="12" y1="12" y2="12" />
-                <line x1="8" x2="3" y1="12" y2="12" />
-                <line x1="21" x2="16" y1="19" y2="19" />
-                <line x1="12" x2="3" y1="19" y2="19" />
-                <line x1="14" x2="14" y1="3" y2="7" />
-                <line x1="8" x2="8" y1="10" y2="14" />
-                <line x1="16" x2="16" y1="17" y2="21" />
-              </TopSvg>
-              Settings
-            </Link>
-            <Link
-              href="/login"
-              role="menuitem"
-              onClick={() => setOpen(false)}
-              className="flex items-center gap-2.5 px-4 py-2 text-[13px] font-medium text-red-600 outline-none transition-colors hover:bg-red-50 focus-visible:bg-red-50"
-            >
-              <TopSvg className="h-4 w-4">
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                <polyline points="16 17 21 12 16 7" />
-                <line x1="21" x2="9" y1="12" y2="12" />
-              </TopSvg>
-              Sign out
-            </Link>
-          </div>
-        </div>
-      )}
-    </div>
+          <TopSvg className="hidden h-3.5 w-3.5 text-slate-400 lg:block">
+            <path d="m6 9 6 6 6-6" />
+          </TopSvg>
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-60">
+        <DropdownMenuLabel className="flex flex-col gap-0.5">
+          <span className="flex items-center justify-between gap-2">
+            <span className="truncate font-semibold text-slate-900">{DEMO_USER.name}</span>
+            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide text-emerald-700">
+              {DEMO_USER.role}
+            </span>
+          </span>
+          <span className="truncate text-[12px] font-normal text-slate-500">
+            {DEMO_USER.email}
+          </span>
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem asChild>
+          <Link href="/settings" className="cursor-pointer">
+            <Icon name="settings" size={15} className="text-slate-500" />
+            Settings
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          variant="destructive"
+          onSelect={() => {
+            void signOut();
+          }}
+        >
+          <Icon name="logout" size={15} />
+          Sign out
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
