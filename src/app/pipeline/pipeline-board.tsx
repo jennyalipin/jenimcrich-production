@@ -203,7 +203,7 @@ function BoardInner({ cards: initialCards, jobs, stalledDays, stalledEnabled }: 
   const filteringJob = jobFilter !== ALL_JOBS;
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex h-full min-h-0 flex-col gap-4">
       {/* Header row: helper copy + job filter + list-view link */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="max-w-2xl text-[12.5px] leading-relaxed text-slate-500">
@@ -212,8 +212,8 @@ function BoardInner({ cards: initialCards, jobs, stalledDays, stalledEnabled }: 
           {stalledEnabled ? (
             <>
               {" "}
-              <span className="font-semibold text-warning-ink">Amber edge</span> = stalled ≥{" "}
-              {stalledDays}d.
+              The amber <span className="font-semibold text-warning-ink">stalled</span> flag
+              marks no movement in ≥ {stalledDays}d.
             </>
           ) : null}
         </p>
@@ -284,7 +284,7 @@ function BoardInner({ cards: initialCards, jobs, stalledDays, stalledEnabled }: 
             },
           }}
         >
-          <div className="scrollbar-slim flex items-start gap-3.5 overflow-x-auto pb-3">
+          <div className="scrollbar-slim flex min-h-0 flex-1 items-stretch gap-3.5 overflow-x-auto pb-3">
             {STAGES.map((stage) => (
               <StageColumn
                 key={stage}
@@ -327,17 +327,17 @@ function StageColumn({
       ref={setNodeRef}
       aria-label={`${STAGE_LABELS[stage]} — ${cards.length} candidate${cards.length === 1 ? "" : "s"}`}
       className={cn(
-        "w-60 shrink-0 rounded-card border border-slate-200 bg-slate-100/80 transition-colors",
+        "flex w-60 shrink-0 flex-col rounded-card border border-slate-200 bg-slate-100/80 transition-colors",
         isOver && "-outline-offset-2 bg-primary-faint outline-2 outline-dashed outline-primary",
       )}
     >
-      <header className="flex items-center justify-between border-b border-slate-200 px-3.5 py-2.5">
+      <header className="flex shrink-0 items-center justify-between border-b border-slate-200 px-3.5 py-2.5">
         <h2 className="text-[13px] font-bold text-slate-700">{STAGE_LABELS[stage]}</h2>
         <span className="rounded-full bg-slate-200 px-2 py-px text-[11.5px] font-semibold tabular-nums text-slate-600">
           {cards.length}
         </span>
       </header>
-      <div className="flex min-h-[120px] flex-col gap-2 p-2.5">
+      <div className="scrollbar-slim flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-2.5">
         {cards.map((card) => (
           <DraggableCard key={card.applicationId} card={card} onOpen={onOpen} />
         ))}

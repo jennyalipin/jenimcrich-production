@@ -49,7 +49,7 @@ export default async function PipelinePage() {
     .map((job) => ({ id: job.id, label: `${job.title} — ${job.client_name}` }));
 
   return (
-    <div className="p-6">
+    <div className="flex h-full flex-col p-6">
       <PipelineBoard
         cards={cards}
         jobs={jobOptions}

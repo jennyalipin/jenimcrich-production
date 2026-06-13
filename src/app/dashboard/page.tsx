@@ -233,8 +233,26 @@ export default async function DashboardPage() {
     }),
   ]);
 
+  // Greeting in the agency's timezone (PH, UTC+8); editorial focal header.
+  const phHour = (displayNow().getUTCHours() + 8) % 24;
+  const greeting =
+    phHour < 12 ? "Good morning" : phHour < 18 ? "Good afternoon" : "Good evening";
+
   return (
     <div className="space-y-4 p-6">
+      <header className="pb-1">
+        <p className="eyebrow">Recruiter workspace</p>
+        <p className="heading-tight mt-1 text-[26px] text-ink">
+          {greeting}, Jenny — the{" "}
+          <span className="serif-accent text-primary">pipeline</span> is moving
+        </p>
+        <p className="mt-1.5 text-[13.5px] text-slate-500">
+          {stats.active_candidates} candidates active across {stats.open_jobs} open
+          role{stats.open_jobs === 1 ? "" : "s"} · {stats.stalled_count} need a nudge ·{" "}
+          {weekInterviews.length} interview{weekInterviews.length === 1 ? "" : "s"} this week
+        </p>
+      </header>
+
       <TodayBanner interviews={stats.todays_interviews} />
 
       <section aria-labelledby="dashboard-kpis">
