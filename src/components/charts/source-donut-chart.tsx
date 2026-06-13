@@ -48,7 +48,7 @@ export function SourceDonutChart({ data, size = 184 }: SourceDonutChartProps) {
   return (
     <div className="flex flex-col items-center gap-5 sm:flex-row">
       <div className="relative shrink-0" style={{ width: size, height: size }}>
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer width={size} height={size}>
           <PieChart margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
             <Tooltip content={DonutTooltip} />
             <Pie

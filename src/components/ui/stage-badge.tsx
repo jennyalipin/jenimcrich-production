@@ -15,7 +15,7 @@ export type PipelineStage = (typeof PIPELINE_STAGES)[number];
 /** Accepts display casing ("Interview") or DB enum casing ("interview"). */
 export type StageInput = PipelineStage | Lowercase<PipelineStage>;
 
-/* Hues ramp with pipeline heat: slate -> blue -> violet -> amber -> emerald;
+/* Hues ramp with pipeline heat: slate -> blue -> cyan -> amber -> emerald;
    red is the exit. Matches the prototype's STAGE_BADGE map. */
 const stageClass: Record<PipelineStage, string> = {
   Applied: "bg-slate-200 text-slate-700",

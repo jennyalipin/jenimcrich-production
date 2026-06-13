@@ -9,6 +9,7 @@ import {
   CardTitle,
   DataTable,
   EmptyState,
+  Icon,
   type DataTableColumn,
 } from "@/components/ui";
 import type { DocumentView } from "../_lib/view-types";
@@ -18,8 +19,9 @@ const columns: ReadonlyArray<DataTableColumn<DocumentView>> = [
     key: "file",
     header: "File",
     cell: (d) => (
-      <span className="font-semibold text-slate-800">
-        <span aria-hidden="true">📄</span> {d.fileName}
+      <span className="inline-flex items-center gap-1.5 font-semibold text-slate-800">
+        <Icon name="document" size={15} className="shrink-0 text-slate-500" />
+        {d.fileName}
       </span>
     ),
     sortValue: (d) => d.fileName,
@@ -58,7 +60,7 @@ export function DocumentsPanel({ documents }: { documents: DocumentView[] }) {
           disabled
           title="Available once Supabase Storage is connected"
         >
-          + Upload file
+          <Icon name="plus" size={14} /> Upload file
         </Button>
       </CardHeader>
       <CardBody className="space-y-3">
@@ -75,7 +77,7 @@ export function DocumentsPanel({ documents }: { documents: DocumentView[] }) {
           ariaLabel="Candidate documents"
           empty={
             <EmptyState
-              icon="📁"
+              icon={<Icon name="document" size={20} />}
               title="No documents on file"
               hint="Resumes, certifications and offer letters will appear here once storage is connected."
             />

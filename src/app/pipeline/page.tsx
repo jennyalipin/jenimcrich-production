@@ -9,6 +9,9 @@ import {
 import { STAGES } from "@/lib/data/types";
 import { matchScore } from "@/lib/scoring";
 import { PipelineBoard, type BoardCard, type JobOption } from "./pipeline-board";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = { title: "Pipeline — JeniMcRich Recruitment" };
 
 /** Demo data mutates in-memory via server actions — never serve a stale board. */
 export const dynamic = "force-dynamic";

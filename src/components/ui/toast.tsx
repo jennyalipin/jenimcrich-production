@@ -11,6 +11,7 @@ import {
   type ReactNode,
 } from "react";
 import { cn } from "./cn";
+import { Icon, type IconName } from "./icon";
 
 export type ToastVariant = "success" | "error" | "info";
 
@@ -44,11 +45,11 @@ export function useToast(): ToastApi {
   return api;
 }
 
-/* Dark slate chips with a status left rail — the prototype's toast language. */
-const railClass: Record<ToastVariant, string> = {
-  success: "border-l-emerald-500",
-  error: "border-l-danger",
-  info: "border-l-info",
+/* Dark slate chips with a leading status icon (no accent left-rail). */
+const toastIcon: Record<ToastVariant, { name: IconName; tint: string }> = {
+  success: { name: "success", tint: "text-emerald-400" },
+  error: { name: "alert", tint: "text-red-400" },
+  info: { name: "info", tint: "text-sky-400" },
 };
 
 export interface ToastProviderProps {
@@ -119,11 +120,13 @@ export function ToastProvider({ children, duration = 4200 }: ToastProviderProps)
           <div
             key={item.id}
             role="status"
-            className={cn(
-              "pointer-events-auto flex w-full animate-toast-in items-start gap-3 rounded-[10px] border-l-4 bg-sidebar px-4 py-2.5 text-[13px] leading-snug text-white shadow-overlay",
-              railClass[item.variant],
-            )}
+            className="pointer-events-auto flex w-full animate-toast-in items-start gap-2.5 rounded-[10px] bg-sidebar px-4 py-2.5 text-[13px] leading-snug text-white shadow-overlay"
           >
+            <Icon
+              name={toastIcon[item.variant].name}
+              size={16}
+              className={cn("mt-0.5 shrink-0", toastIcon[item.variant].tint)}
+            />
             <span className="flex-1 py-0.5">{item.message}</span>
             <button
               type="button"

@@ -7,6 +7,7 @@ import {
   CardBody,
   CardHeader,
   CardTitle,
+  Icon,
   ToastProvider,
 } from "@/components/ui";
 import { getSettings } from "@/lib/data";
@@ -37,8 +38,8 @@ const ROLE_MATRIX: ReadonlyArray<{
 
 function Allowed({ allowed }: { allowed: boolean }) {
   return allowed ? (
-    <span className="font-semibold text-primary">
-      <span aria-hidden="true">✓</span>
+    <span className="inline-flex justify-center text-primary">
+      <Icon name="check" size={16} />
       <span className="sr-only">Allowed</span>
     </span>
   ) : (
@@ -102,13 +103,13 @@ function RolesCard() {
               <th scope="col" className="micro-label pb-2 pr-2 text-slate-500">
                 Capability
               </th>
-              <th scope="col" className="micro-label pb-2 text-center text-slate-500">
+              <th scope="col" className="micro-label px-3 pb-2 text-center text-slate-500">
                 Admin
               </th>
-              <th scope="col" className="micro-label pb-2 text-center text-slate-500">
+              <th scope="col" className="micro-label px-3 pb-2 text-center text-slate-500">
                 Recruiter
               </th>
-              <th scope="col" className="micro-label pb-2 text-center text-slate-500">
+              <th scope="col" className="micro-label px-3 pb-2 text-center text-slate-500">
                 Hiring Mgr
               </th>
             </tr>
@@ -117,13 +118,13 @@ function RolesCard() {
             {ROLE_MATRIX.map((row) => (
               <tr key={row.capability} className="border-b border-slate-100 last:border-0">
                 <td className="py-2 pr-2 text-slate-700">{row.capability}</td>
-                <td className="py-2 text-center">
+                <td className="px-3 py-2 text-center">
                   <Allowed allowed={row.admin} />
                 </td>
-                <td className="py-2 text-center">
+                <td className="px-3 py-2 text-center">
                   <Allowed allowed={row.recruiter} />
                 </td>
-                <td className="py-2 text-center">
+                <td className="px-3 py-2 text-center">
                   <Allowed allowed={row.hiringManager} />
                 </td>
               </tr>

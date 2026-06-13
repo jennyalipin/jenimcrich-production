@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { cn } from "./cn";
+import { Icon } from "./icon";
 
 export type BadgeVariant =
   | "default"
@@ -36,7 +37,7 @@ export interface BadgeProps {
 export function Badge({ variant = "default", children, className, title }: BadgeProps) {
   return (
     <span title={title} className={cn(badgeBaseClass, variantClass[variant], className)}>
-      {variant === "visa" ? <span aria-hidden="true">🛂</span> : null}
+      {variant === "visa" ? <Icon name="visa" size={12} className="-ml-0.5" /> : null}
       {children}
     </span>
   );

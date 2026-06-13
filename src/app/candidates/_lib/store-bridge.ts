@@ -26,6 +26,14 @@ import {
   type Job,
   type Source,
 } from "@/lib/data";
+import { getSupabaseServerClient } from "@/lib/supabase/server";
+import {
+  sbAddCandidateTag,
+  sbInsertCandidate,
+  sbRemoveCandidateTag,
+  sbSetCandidateArchived,
+  sbSetCandidateFlag,
+} from "@/lib/data/supabase-mutations";
 
 if (typeof window !== "undefined") {
   throw new Error("store-bridge is server-only. Call it from server actions.");
@@ -111,7 +119,29 @@ export interface CreatedCandidate {
   duplicateEmail: boolean;
 }
 
+/** Mirrors the prototype: summary + skill list until a real resume is parsed. */
+function buildResumeText(summary: string, skills: CandidateSkill[]): string {
+  return [summary.trim(), skills.map((sk) => sk.skill).join(", ")].filter(Boolean).join("\n\n");
+}
+
 export async function insertCandidate(input: NewCandidateInput): Promise<CreatedCandidate> {
+  const supabase = await getSupabaseServerClient();
+  if (supabase) {
+    return sbInsertCandidate(supabase, {
+      full_name: input.full_name,
+      email: input.email,
+      phone: input.phone,
+      location: input.location,
+      source: input.source,
+      years_exp: input.years_exp,
+      expected_salary: input.expected_salary,
+      notice_period: input.notice_period,
+      summary: input.summary,
+      resume_text: buildResumeText(input.summary, input.skills),
+      skills: input.skills,
+      job_id: input.job_id,
+    });
+  }
   const s = await store();
   const job = s.jobs.find((j) => j.id === input.job_id && j.archived_at === null);
   if (!job) {
@@ -172,6 +202,20 @@ export async function insertCandidate(input: NewCandidateInput): Promise<Created
 /* ------------------------------------------------------------------ */
 
 export async function toggleCandidateFlag(id: string): Promise<boolean> {
+  const supabase = await getSupabaseServerClient();
+  if (supabase) {
+    const { data, error } = await supabase
+      .from("candidates")
+      .select("flagged")
+      .eq("id", id)
+      .maybeSingle();
+    if (error || !data) {
+      throw new DataLayerError("NOT_FOUND", "That candidate could not be found. They may have been archived.");
+    }
+    const next = !data.flagged;
+    await sbSetCandidateFlag(supabase, id, next);
+    return next;
+  }
   const s = await store();
   const cand = candidateOrThrow(s, id);
   cand.flagged = !cand.flagged;
@@ -181,6 +225,11 @@ export async function toggleCandidateFlag(id: string): Promise<boolean> {
 }
 
 export async function setCandidateArchived(id: string, archived: boolean): Promise<void> {
+  const supabase = await getSupabaseServerClient();
+  if (supabase) {
+    await sbSetCandidateArchived(supabase, id, archived);
+    return;
+  }
   const s = await store();
   const cand = candidateOrThrow(s, id);
   if ((cand.archived_at !== null) === archived) return; // no-op
@@ -196,10 +245,15 @@ export async function setCandidateArchived(id: string, archived: boolean): Promi
 }
 
 export async function addCandidateTag(id: string, tag: string): Promise<void> {
-  const s = await store();
-  const cand = candidateOrThrow(s, id);
   const clean = tag.trim();
   if (!clean) throw new DataLayerError("VALIDATION", "The tag cannot be empty.");
+  const supabase = await getSupabaseServerClient();
+  if (supabase) {
+    await sbAddCandidateTag(supabase, id, clean);
+    return;
+  }
+  const s = await store();
+  const cand = candidateOrThrow(s, id);
   if (cand.tags.some((t) => t.toLowerCase() === clean.toLowerCase())) return; // already tagged
   cand.tags.push(clean);
   cand.updated_at = nowIso();
@@ -207,6 +261,11 @@ export async function addCandidateTag(id: string, tag: string): Promise<void> {
 }
 
 export async function removeCandidateTag(id: string, tag: string): Promise<void> {
+  const supabase = await getSupabaseServerClient();
+  if (supabase) {
+    await sbRemoveCandidateTag(supabase, id, tag);
+    return;
+  }
   const s = await store();
   const cand = candidateOrThrow(s, id);
   if (!cand.tags.includes(tag)) return;

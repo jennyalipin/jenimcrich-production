@@ -5,6 +5,7 @@ import {
   Badge,
   DataTable,
   EmptyState,
+  Icon,
   ScorePill,
   StageBadge,
   cn,
@@ -18,13 +19,11 @@ const columns: ReadonlyArray<DataTableColumn<CandidateListRow>> = [
     header: <span className="sr-only">Flagged</span>,
     cell: (r) =>
       r.flagged ? (
-        <span title="Priority candidate" role="img" aria-label="Flagged priority">
-          ⭐
+        <span title="Priority candidate" className="inline-flex text-amber-400">
+          <Icon name="star" size={15} fill label="Flagged priority" />
         </span>
       ) : (
-        <span className="text-slate-200" aria-hidden="true">
-          ☆
-        </span>
+        <Icon name="star" size={15} className="text-slate-300" />
       ),
     sortValue: (r) => (r.flagged ? 1 : 0),
     className: "w-8",
@@ -36,7 +35,7 @@ const columns: ReadonlyArray<DataTableColumn<CandidateListRow>> = [
     cell: (r) => (
       <div>
         <p className="font-semibold text-slate-800">{r.name}</p>
-        <p className="text-[12px] text-slate-400">{r.email}</p>
+        <p className="text-[12px] text-slate-500">{r.email}</p>
       </div>
     ),
     sortValue: (r) => r.name,
@@ -47,18 +46,18 @@ const columns: ReadonlyArray<DataTableColumn<CandidateListRow>> = [
     cell: (r) =>
       r.roleTitle ? (
         <div>
-          <p className="text-slate-700">
-            {r.roleTitle}{" "}
+          <p className="inline-flex items-center gap-1 text-slate-700">
+            {r.roleTitle}
             {r.restrictiveVisa ? (
-              <span title="Restrictive visa requirement" role="img" aria-label="Restrictive visa requirement">
-                🛂
+              <span title="Restrictive visa requirement" className="inline-flex text-slate-500">
+                <Icon name="visa" size={14} label="Restrictive visa requirement" />
               </span>
             ) : null}
           </p>
-          <p className="text-[12px] text-slate-400">{r.roleClient}</p>
+          <p className="text-[12px] text-slate-500">{r.roleClient}</p>
         </div>
       ) : (
-        <span className="text-slate-400">No application</span>
+        <span className="text-slate-500">No application</span>
       ),
     sortValue: (r) => r.roleTitle,
   },
@@ -94,7 +93,7 @@ const columns: ReadonlyArray<DataTableColumn<CandidateListRow>> = [
         {r.topSkills.map((skill) => (
           <Badge key={skill}>{skill}</Badge>
         ))}
-        {r.moreSkills > 0 ? <span className="text-[11px] text-slate-400">+{r.moreSkills}</span> : null}
+        {r.moreSkills > 0 ? <span className="text-[11px] text-slate-500">+{r.moreSkills}</span> : null}
       </span>
     ),
   },
@@ -129,11 +128,11 @@ const columns: ReadonlyArray<DataTableColumn<CandidateListRow>> = [
       r.daysInStage === null ? (
         <span className="text-slate-300">—</span>
       ) : (
-        <span className={cn("tabular-nums", r.stalled && "font-bold text-warning-ink")}>
-          {r.daysInStage}d{" "}
+        <span className={cn("inline-flex items-center justify-end gap-1 tabular-nums", r.stalled && "font-bold text-warning-ink")}>
+          {r.daysInStage}d
           {r.stalled ? (
-            <span title="Stalled — no movement past the configured threshold" role="img" aria-label="Stalled">
-              ⚠
+            <span title="Stalled — no movement past the configured threshold" className="inline-flex text-warning-ink">
+              <Icon name="stalled" size={13} label="Stalled" />
             </span>
           ) : null}
         </span>
@@ -157,7 +156,7 @@ export function CandidatesTable({ rows }: { rows: CandidateListRow[] }) {
       ariaLabel="Candidates"
       empty={
         <EmptyState
-          icon="👥"
+          icon={<Icon name="candidates" size={20} />}
           title="No candidates match these filters"
           hint="Adjust the filters on the left, or add a candidate to get started."
         />

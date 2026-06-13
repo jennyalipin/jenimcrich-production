@@ -1,7 +1,7 @@
 import { Card } from "@/components/ui";
 import {
   ACTIVE_STAGES,
-  REFERENCE_NOW,
+  displayNow,
   getCandidates,
   getClients,
   getJobs,
@@ -13,6 +13,9 @@ import { DEFAULT_SKILL_DICTIONARY } from "@/lib/jd-parser";
 import { listLocalJobs } from "./_lib/job-store";
 import { JobsTable, type JobRow } from "./jobs-table";
 import { NewJobButton } from "./new-job-button";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = { title: "Jobs — JeniMcRich Recruitment" };
 
 const STATUS_ORDER: Record<JobStatus, number> = { open: 0, on_hold: 1, closed: 2 };
 
@@ -61,7 +64,7 @@ export default async function JobsPage() {
     status: job.status,
     open_count: ACTIVE_STAGES.reduce((n, stage) => n + job.stage_counts[stage], 0),
     applicant_count: job.applicant_count,
-    days_open: daysSince(job.opened_at, REFERENCE_NOW),
+    days_open: daysSince(job.opened_at, displayNow()),
     skills: job.skills,
   }));
 

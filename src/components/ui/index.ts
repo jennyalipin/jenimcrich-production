@@ -6,6 +6,8 @@
 
 export { cn } from "./cn";
 export { controlClass } from "./control";
+export { Icon, type IconName, type IconProps } from "./icon";
+export { Logo, LogoMark } from "./logo";
 
 export { Badge, badgeBaseClass, type BadgeProps, type BadgeVariant } from "./badge";
 export { ScorePill, scoreBand, type ScorePillProps, type ScoreBand } from "./score-pill";

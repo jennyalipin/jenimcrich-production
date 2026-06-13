@@ -22,8 +22,22 @@
  * deterministic; mutation timestamps use max(wall clock, REFERENCE_NOW).
  */
 
+import { cache } from "react";
 import { daysBetween, formatFullDateTime } from "@/lib/format";
+import { getSupabaseServerClient, type SupabaseServerClient } from "@/lib/supabase/server";
+import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { createDemoStore, REFERENCE_NOW, type DemoStore } from "./demo-data";
+import { loadStore } from "./supabase-store";
+import {
+  sbAddNote,
+  sbAddScorecard,
+  sbCancelInterview,
+  sbIsSlotTaken,
+  sbLogEmail,
+  sbMoveStage,
+  sbScheduleInterview,
+  sbUpdateSettings,
+} from "./supabase-mutations";
 import {
   ACTIVE_STAGES,
   DataLayerError,
@@ -89,6 +103,23 @@ function db(): DemoStore {
   return (globalRef.__jmrDemoStore ??= createDemoStore());
 }
 
+/**
+ * The store every read derives from. When Supabase is configured it is a
+ * fresh RLS-scoped snapshot of the live DB; otherwise the in-memory demo
+ * store. `cache()` dedupes the hydration across one server render so a page
+ * that calls several accessors only loads once. Mutations deliberately call
+ * `loadStore` directly (post-write) to bypass this per-request cache.
+ */
+const getStore = cache(async (): Promise<DemoStore> => {
+  const supabase = await getSupabaseServerClient();
+  return supabase ? loadStore(supabase) : db();
+});
+
+/** Mutations need the live store reflecting their own write — never cached. */
+async function freshStore(supabase: SupabaseServerClient): Promise<DemoStore> {
+  return loadStore(supabase);
+}
+
 /** Restores the pristine demo seed (Settings → "Reset demo data"). */
 export async function resetDemoData(): Promise<void> {
   globalRef.__jmrDemoStore = createDemoStore();
@@ -97,7 +128,26 @@ export async function resetDemoData(): Promise<void> {
 const NOW_MS = REFERENCE_NOW.getTime();
 const DAY_MS = 86_400_000;
 
-/** Mutation timestamp: never earlier than the demo reference instant. */
+/**
+ * "Now" for relative reads (days-in-stage, stalled, upcoming/today's
+ * interviews). On the live Supabase store rows carry real timestamps, so the
+ * math must use the real wall clock; the in-memory demo store is built around
+ * the fixed REFERENCE_NOW so SSR output stays deterministic there.
+ */
+function readNowMs(): number {
+  return isSupabaseConfigured() ? Date.now() : NOW_MS;
+}
+
+/**
+ * "Now" for display formatting in pages (relative times, "as of" labels,
+ * days-open). Mirrors {@link readNowMs}: real clock on live Supabase data,
+ * the fixed REFERENCE_NOW for the deterministic in-memory demo.
+ */
+export function displayNow(): Date {
+  return isSupabaseConfigured() ? new Date() : REFERENCE_NOW;
+}
+
+/** Mutation timestamp (demo path only): never earlier than the reference instant. */
 function nowIso(): string {
   return new Date(Math.max(Date.now(), NOW_MS)).toISOString();
 }
@@ -114,7 +164,7 @@ function uid(prefix: string): string {
 
 /** Whole days from `iso` to REFERENCE_NOW, clamped ≥ 0. */
 function daysAgoOf(iso: string): number {
-  return Math.max(0, Math.floor((NOW_MS - Date.parse(iso)) / DAY_MS));
+  return Math.max(0, Math.floor((readNowMs() - Date.parse(iso)) / DAY_MS));
 }
 
 /* ------------------------------------------------------------------ */
@@ -167,7 +217,7 @@ function lastTouchMs(s: DemoStore, app: Application): number {
 }
 
 function daysStalledOf(s: DemoStore, app: Application): number {
-  return Math.max(0, Math.floor((NOW_MS - lastTouchMs(s, app)) / DAY_MS));
+  return Math.max(0, Math.floor((readNowMs() - lastTouchMs(s, app)) / DAY_MS));
 }
 
 function isStalled(s: DemoStore, app: Application, candidate: Candidate): boolean {
@@ -233,7 +283,7 @@ const JOB_STATUS_ORDER: Record<Job["status"], number> = { open: 0, on_hold: 1, c
 
 /** Jobs with applicant stats. Sorted open → on hold → closed, newest first. */
 export async function getJobs(filters?: JobFilters): Promise<JobWithStats[]> {
-  const s = db();
+  const s = await getStore();
   const q = filters?.q?.trim().toLowerCase();
   return s.jobs
     .filter((j) => j.archived_at === null)
@@ -256,13 +306,13 @@ export async function getJobs(filters?: JobFilters): Promise<JobWithStats[]> {
 }
 
 export async function getJob(id: string): Promise<JobWithStats | null> {
-  const s = db();
+  const s = await getStore();
   const job = s.jobs.find((j) => j.id === id && j.archived_at === null);
   return job ? { ...clone(job), ...jobStats(s, job.id) } : null;
 }
 
 export async function getClients(): Promise<Client[]> {
-  return clone(db().clients);
+  return clone((await getStore()).clients);
 }
 
 /* ------------------------------------------------------------------ */
@@ -278,7 +328,7 @@ function candidateApplications(s: DemoStore, candidateId: string): ApplicationWi
 
 /** Candidates with their applications+jobs attached. Seed order is stable. */
 export async function getCandidates(filters?: CandidateFilters): Promise<CandidateWithApplications[]> {
-  const s = db();
+  const s = await getStore();
   const q = filters?.q?.trim().toLowerCase();
 
   return s.candidates
@@ -315,7 +365,7 @@ export async function getCandidates(filters?: CandidateFilters): Promise<Candida
 
 /** Full profile for the candidate detail page (all tabs in one call). */
 export async function getCandidate(id: string): Promise<CandidateProfile | null> {
-  const s = db();
+  const s = await getStore();
   const cand = s.candidates.find((c) => c.id === id);
   if (!cand) return null;
   return {
@@ -335,14 +385,14 @@ export async function getCandidate(id: string): Promise<CandidateProfile | null>
 /* ------------------------------------------------------------------ */
 
 export async function getApplication(id: string): Promise<ApplicationWithRelations | null> {
-  const s = db();
+  const s = await getStore();
   const app = s.applications.find((a) => a.id === id);
   return app ? withRelations(s, app) : null;
 }
 
 /** Kanban feed: every stage (incl. hired/rejected), oldest-in-stage first. */
 export async function getApplicationsByStage(): Promise<Record<Stage, ApplicationWithRelations[]>> {
-  const s = db();
+  const s = await getStore();
   const result: Record<Stage, ApplicationWithRelations[]> = {
     applied: [], screening: [], interview: [], offer: [], hired: [], rejected: [],
   };
@@ -356,7 +406,7 @@ export async function getApplicationsByStage(): Promise<Record<Stage, Applicatio
 }
 
 export async function getApplicationsForJob(jobId: string): Promise<ApplicationWithRelations[]> {
-  const s = db();
+  const s = await getStore();
   jobOrThrow(s, jobId);
   return liveApplications(s)
     .filter((a) => a.job_id === jobId)
@@ -365,7 +415,7 @@ export async function getApplicationsForJob(jobId: string): Promise<ApplicationW
 }
 
 export async function getApplicationsForCandidate(candidateId: string): Promise<ApplicationWithJob[]> {
-  const s = db();
+  const s = await getStore();
   candidateOrThrow(s, candidateId);
   return candidateApplications(s, candidateId);
 }
@@ -379,10 +429,18 @@ export async function moveApplicationStage(
   stage: Stage,
   actorName = "Jenny M.",
 ): Promise<ApplicationWithRelations> {
-  const s = db();
   if (!STAGES.includes(stage)) {
     throw new DataLayerError("VALIDATION", `"${String(stage)}" is not a valid pipeline stage.`);
   }
+  const supabase = await getSupabaseServerClient();
+  if (supabase) {
+    await sbMoveStage(supabase, applicationId, stage);
+    const s = await freshStore(supabase);
+    const app = s.applications.find((a) => a.id === applicationId);
+    if (!app) throw new DataLayerError("NOT_FOUND", "That application could not be found.");
+    return withRelations(s, app);
+  }
+  const s = db();
   const app = applicationOrThrow(s, applicationId);
   if (app.stage !== stage) {
     const job = jobOrThrow(s, app.job_id);
@@ -399,9 +457,17 @@ export async function moveApplicationStage(
 /* ------------------------------------------------------------------ */
 
 export async function addNote(input: AddNoteInput): Promise<Note> {
-  const s = db();
   const body = input.body.trim();
   if (!body) throw new DataLayerError("VALIDATION", "The note text cannot be empty.");
+  const supabase = await getSupabaseServerClient();
+  if (supabase) {
+    const id = await sbAddNote(supabase, { ...input, body });
+    const s = await freshStore(supabase);
+    const note = s.notes.find((n) => n.id === id);
+    if (!note) throw new DataLayerError("VALIDATION", "The note was saved but could not be re-read.");
+    return note;
+  }
+  const s = db();
   candidateOrThrow(s, input.candidate_id);
 
   const ts = nowIso();
@@ -420,17 +486,30 @@ export async function addNote(input: AddNoteInput): Promise<Note> {
 }
 
 export async function getNotes(candidateId: string): Promise<Note[]> {
-  const s = db();
+  const s = await getStore();
   return clone(s.notes.filter((n) => n.candidate_id === candidateId)).sort((a, b) =>
     byIsoDesc(a.created_at, b.created_at),
   );
 }
 
 export async function addScorecard(input: AddScorecardInput): Promise<Scorecard> {
-  const s = db();
   if (!input.summary.trim()) {
     throw new DataLayerError("VALIDATION", "A scorecard needs a written summary.");
   }
+  const supabase = await getSupabaseServerClient();
+  if (supabase) {
+    const pre = await freshStore(supabase);
+    const app = pre.applications.find((a) => a.id === input.application_id);
+    if (!app) throw new DataLayerError("NOT_FOUND", "That application could not be found.");
+    const interviewer = pre.interviewers.find((u) => u.id === input.interviewer_id);
+    if (!interviewer) throw new DataLayerError("NOT_FOUND", "That interviewer could not be found.");
+    const id = await sbAddScorecard(supabase, input, app.candidate_id, interviewer.name);
+    const s = await freshStore(supabase);
+    const scorecard = s.scorecards.find((sc) => sc.id === id);
+    if (!scorecard) throw new DataLayerError("VALIDATION", "The scorecard was saved but could not be re-read.");
+    return scorecard;
+  }
+  const s = db();
   const app = applicationOrThrow(s, input.application_id);
   const interviewer = s.interviewers.find((u) => u.id === input.interviewer_id);
   if (!interviewer) throw new DataLayerError("NOT_FOUND", "That interviewer could not be found.");
@@ -459,11 +538,11 @@ export async function addScorecard(input: AddScorecardInput): Promise<Scorecard>
 
 /** Raw templates — merge-field rendering belongs to "@/lib/merge". */
 export async function getTemplates(): Promise<EmailTemplate[]> {
-  return clone(db().templates);
+  return clone((await getStore()).templates);
 }
 
 export async function getTemplate(id: string): Promise<EmailTemplate | null> {
-  const t = db().templates.find((tpl) => tpl.id === id);
+  const t = (await getStore()).templates.find((tpl) => tpl.id === id);
   return t ? clone(t) : null;
 }
 
@@ -472,6 +551,17 @@ export async function getTemplate(id: string): Promise<EmailTemplate | null> {
  * (domain rule 6). Demo layer only logs — Resend wiring comes later.
  */
 export async function logEmail(input: LogEmailInput): Promise<EmailLogEntry> {
+  const supabase = await getSupabaseServerClient();
+  if (supabase) {
+    const pre = await freshStore(supabase);
+    const cand = pre.candidates.find((c) => c.id === input.candidate_id);
+    if (!cand) throw new DataLayerError("NOT_FOUND", "That candidate could not be found.");
+    const id = await sbLogEmail(supabase, input, input.to_email ?? cand.email);
+    const s = await freshStore(supabase);
+    const entry = s.email_log.find((e) => e.id === id);
+    if (!entry) throw new DataLayerError("VALIDATION", "The email was logged but could not be re-read.");
+    return entry;
+  }
   const s = db();
   const cand = candidateOrThrow(s, input.candidate_id);
   const ts = nowIso();
@@ -492,7 +582,7 @@ export async function logEmail(input: LogEmailInput): Promise<EmailLogEntry> {
 }
 
 export async function getEmailLog(candidateId?: string): Promise<EmailLogEntry[]> {
-  const s = db();
+  const s = await getStore();
   return clone(candidateId ? s.email_log.filter((e) => e.candidate_id === candidateId) : s.email_log).sort(
     (a, b) => byIsoDesc(a.sent_at, b.sent_at),
   );
@@ -503,12 +593,12 @@ export async function getEmailLog(candidateId?: string): Promise<EmailLogEntry[]
 /* ------------------------------------------------------------------ */
 
 export async function getInterviewers(): Promise<Interviewer[]> {
-  return clone(db().interviewers);
+  return clone((await getStore()).interviewers);
 }
 
 /** Interviews joined with candidate/job/application, sorted by start time. */
 export async function getInterviews(range?: InterviewRange): Promise<InterviewWithRelations[]> {
-  const s = db();
+  const s = await getStore();
   const fromMs = range?.from ? Date.parse(range.from) : Number.NEGATIVE_INFINITY;
   const toMs = range?.to ? Date.parse(range.to) : Number.POSITIVE_INFINITY;
   return s.interviews
@@ -531,6 +621,10 @@ export async function isSlotTaken(interviewerId: string, startsAt: string): Prom
   if (Number.isNaN(t)) {
     throw new DataLayerError("VALIDATION", "That interview time is not a valid date.");
   }
+  const supabase = await getSupabaseServerClient();
+  if (supabase) {
+    return sbIsSlotTaken(supabase, interviewerId, new Date(t).toISOString());
+  }
   return db().interviews.some(
     (iv) => iv.interviewer_id === interviewerId && iv.status === "scheduled" && Date.parse(iv.starts_at) === t,
   );
@@ -542,13 +636,36 @@ export async function isSlotTaken(interviewerId: string, startsAt: string): Prom
  * confirmation email + activity entry, mirroring the prototype.
  */
 export async function scheduleInterview(input: ScheduleInterviewInput): Promise<InterviewWithRelations> {
+  if (Number.isNaN(Date.parse(input.starts_at))) {
+    throw new DataLayerError("VALIDATION", "That interview time is not a valid date.");
+  }
+  const supabase = await getSupabaseServerClient();
+  if (supabase) {
+    const pre = await freshStore(supabase);
+    const app = pre.applications.find((a) => a.id === input.application_id);
+    if (!app) throw new DataLayerError("NOT_FOUND", "That application could not be found.");
+    const interviewer = pre.interviewers.find((u) => u.id === input.interviewer_id);
+    if (!interviewer) throw new DataLayerError("NOT_FOUND", "That interviewer could not be found.");
+    const slotMsg = `${interviewer.name} is already booked at ${formatFullDateTime(input.starts_at)} (UTC). Please pick a different slot.`;
+    if (await isSlotTaken(interviewer.id, input.starts_at)) {
+      throw new DataLayerError("SLOT_TAKEN", slotMsg);
+    }
+    const id = await sbScheduleInterview(supabase, input, app.candidate_id, interviewer.name, slotMsg);
+    // Confirmation email is part of the booking flow (rule 6: log to both).
+    await logEmail({
+      candidate_id: app.candidate_id,
+      subject: `Interview Confirmation – ${formatFullDateTime(new Date(Date.parse(input.starts_at)).toISOString())} (UTC)`,
+      status: "sent",
+    });
+    const s = await freshStore(supabase);
+    const iv = s.interviews.find((x) => x.id === id);
+    if (!iv) throw new DataLayerError("VALIDATION", "The interview was booked but could not be re-read.");
+    return interviewWithRelations(s, iv);
+  }
   const s = db();
   const app = applicationOrThrow(s, input.application_id);
   const interviewer = s.interviewers.find((u) => u.id === input.interviewer_id);
   if (!interviewer) throw new DataLayerError("NOT_FOUND", "That interviewer could not be found.");
-  if (Number.isNaN(Date.parse(input.starts_at))) {
-    throw new DataLayerError("VALIDATION", "That interview time is not a valid date.");
-  }
   if (await isSlotTaken(interviewer.id, input.starts_at)) {
     throw new DataLayerError(
       "SLOT_TAKEN",
@@ -589,6 +706,18 @@ export async function scheduleInterview(input: ScheduleInterviewInput): Promise<
 }
 
 export async function cancelInterview(id: string): Promise<Interview> {
+  const supabase = await getSupabaseServerClient();
+  if (supabase) {
+    const pre = await freshStore(supabase);
+    const target = pre.interviews.find((x) => x.id === id);
+    if (!target) throw new DataLayerError("NOT_FOUND", "That interview could not be found.");
+    if (target.status === "scheduled") {
+      await sbCancelInterview(supabase, id, target.candidate_id, target.interviewer_name);
+    }
+    const s = await freshStore(supabase);
+    const iv = s.interviews.find((x) => x.id === id);
+    return iv ?? target;
+  }
   const s = db();
   const iv = s.interviews.find((x) => x.id === id);
   if (!iv) throw new DataLayerError("NOT_FOUND", "That interview could not be found.");
@@ -606,7 +735,7 @@ export async function cancelInterview(id: string): Promise<Interview> {
 
 /** Applications with no stage move / note / email in ≥ N days, worst first. */
 export async function getStalledApplications(): Promise<StalledApplication[]> {
-  const s = db();
+  const s = await getStore();
   return liveApplications(s)
     .filter((app) => isStalled(s, app, candidateOrThrow(s, app.candidate_id)))
     .map((app) => toStalled(s, app))
@@ -629,7 +758,7 @@ function avgDaysToHire(s: DemoStore): number {
 }
 
 export async function getDashboardStats(): Promise<DashboardStats> {
-  const s = db();
+  const s = await getStore();
   const apps = liveApplications(s);
 
   const stage_counts = Object.fromEntries(STAGES.map((st) => [st, 0])) as Record<Stage, number>;
@@ -643,9 +772,9 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   const stalled = await getStalledApplications();
 
   const scheduled = s.interviews
-    .filter((iv) => iv.status === "scheduled" && Date.parse(iv.starts_at) >= NOW_MS)
+    .filter((iv) => iv.status === "scheduled" && Date.parse(iv.starts_at) >= readNowMs())
     .sort((a, b) => byIsoAsc(a.starts_at, b.starts_at));
-  const todayStart = startOfUtcDayMs(NOW_MS);
+  const todayStart = startOfUtcDayMs(readNowMs());
   const todays = s.interviews.filter((iv) => {
     const t = Date.parse(iv.starts_at);
     return iv.status === "scheduled" && t >= todayStart && t < todayStart + DAY_MS;
@@ -668,7 +797,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
 }
 
 export async function getAnalytics(): Promise<AnalyticsData> {
-  const s = db();
+  const s = await getStore();
   const apps = liveApplications(s);
 
   // Funnel: count applications that reached each stage or further;
@@ -741,7 +870,7 @@ export async function getAnalytics(): Promise<AnalyticsData> {
 /* ------------------------------------------------------------------ */
 
 export async function getActivityFeed(limit = 20): Promise<ActivityFeedItem[]> {
-  const s = db();
+  const s = await getStore();
   const names = new Map(s.candidates.map((c) => [c.id, c.full_name]));
   return clone(
     [...s.activity_log]
@@ -752,7 +881,7 @@ export async function getActivityFeed(limit = 20): Promise<ActivityFeedItem[]> {
 }
 
 export async function getSettings(): Promise<Settings> {
-  return clone(db().settings);
+  return clone((await getStore()).settings);
 }
 
 export async function updateSettings(patch: Partial<Settings>): Promise<Settings> {
@@ -762,6 +891,11 @@ export async function updateSettings(patch: Partial<Settings>): Promise<Settings
       "VALIDATION",
       `The stalled-candidate threshold must be one of ${STALLED_DAY_OPTIONS.join(", ")} days.`,
     );
+  }
+  const supabase = await getSupabaseServerClient();
+  if (supabase) {
+    await sbUpdateSettings(supabase, patch);
+    return (await freshStore(supabase)).settings;
   }
   if (patch.stalled_days !== undefined) s.settings.stalled_days = patch.stalled_days;
   if (patch.stalled_enabled !== undefined) s.settings.stalled_enabled = patch.stalled_enabled;

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Card, CardBody, EmptyState } from "@/components/ui";
+import { Card, CardBody, EmptyState, Icon } from "@/components/ui";
 
 export default function CandidateNotFound() {
   return (
@@ -7,7 +7,7 @@ export default function CandidateNotFound() {
       <Card className="mx-auto max-w-xl">
         <CardBody>
           <EmptyState
-            icon="🔍"
+            icon={<Icon name="search" size={20} />}
             title="Candidate not found"
             hint="This profile may have been removed, or the link is out of date."
             action={

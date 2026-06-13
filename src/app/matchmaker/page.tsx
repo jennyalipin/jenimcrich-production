@@ -5,6 +5,9 @@ import {
   type MatchCandidate,
   type MatchJob,
 } from "./matchmaker-client";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = { title: "Matchmaker — JeniMcRich Recruitment" };
 
 /** Jobs/candidates mutate in-memory via other pages' actions — stay fresh. */
 export const dynamic = "force-dynamic";

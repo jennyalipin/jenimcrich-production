@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode, RefObject } from "react";
 
@@ -304,6 +304,31 @@ function UserMenu() {
 export function Topbar({ title }: { title?: string }) {
   const pathname = usePathname() ?? "";
   const pageTitle = title ?? pageTitleFor(pathname);
+  const router = useRouter();
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  // ⌘K / Ctrl-K focuses the search (and "/" when not already typing).
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      const k = event.key.toLowerCase();
+      const inField =
+        document.activeElement instanceof HTMLElement &&
+        ["input", "textarea", "select"].includes(document.activeElement.tagName.toLowerCase());
+      if (((event.metaKey || event.ctrlKey) && k === "k") || (k === "/" && !inField)) {
+        event.preventDefault();
+        searchRef.current?.focus();
+      }
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
+
+  function onSearch(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const q = new FormData(event.currentTarget).get("q");
+    const query = typeof q === "string" ? q.trim() : "";
+    router.push(query ? `/candidates?q=${encodeURIComponent(query)}` : "/candidates");
+  }
 
   return (
     <header className="relative z-40 flex h-16 shrink-0 items-center gap-3 border-b border-slate-800 bg-[#0f172a] px-4 lg:px-6">
@@ -311,25 +336,28 @@ export function Topbar({ title }: { title?: string }) {
         {pageTitle}
       </h1>
 
-      {/* Global search — UI only for now */}
-      <div className="relative hidden w-64 md:block xl:w-80">
-        <TopSvg className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500">
+      {/* Global search → candidate search (the working query surface). */}
+      <form role="search" onSubmit={onSearch} className="relative hidden w-64 md:block xl:w-80">
+        <TopSvg className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400">
           <circle cx="11" cy="11" r="8" />
           <path d="m21 21-4.35-4.35" />
         </TopSvg>
         <input
+          ref={searchRef}
+          name="q"
           type="search"
-          aria-label="Search candidates and jobs"
-          placeholder="Search candidates, jobs…"
-          className="h-9 w-full rounded-lg border border-white/10 bg-white/5 pl-9 pr-11 text-[13px] text-slate-100 outline-none transition-colors placeholder:text-slate-500 focus:border-emerald-500/60 focus:bg-white/10 focus:ring-2 focus:ring-emerald-500/30"
+          enterKeyHint="search"
+          aria-label="Search candidates by name, skill or résumé keyword"
+          placeholder="Search candidates…"
+          className="h-9 w-full rounded-lg border border-white/10 bg-white/5 pl-9 pr-11 text-[13px] text-slate-100 outline-none transition-colors placeholder:text-slate-400 focus:border-emerald-500/60 focus:bg-white/10 focus:ring-2 focus:ring-emerald-500/30"
         />
         <kbd
           aria-hidden="true"
-          className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 rounded border border-white/10 px-1.5 py-0.5 font-mono text-[10px] text-slate-500"
+          className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 rounded border border-white/10 px-1.5 py-0.5 font-mono text-[10px] text-slate-400"
         >
           ⌘K
         </kbd>
-      </div>
+      </form>
 
       <NotificationsBell />
       <UserMenu />

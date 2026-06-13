@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
+import { LogoMark } from "@/components/ui";
 
 /**
  * Fixed-width navigation rail for the JeniMcRich shell.
@@ -148,6 +149,9 @@ function isActive(pathname: string, href: string): boolean {
 
 export function Sidebar() {
   const pathname = usePathname() ?? "";
+  // NEXT_PUBLIC_* is inlined at build time, so this is a safe client read of
+  // whether the app is wired to Supabase vs. the in-memory demo data.
+  const liveData = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
 
   return (
     <aside className="flex h-full w-16 shrink-0 flex-col border-r border-slate-800 bg-[#0f172a] lg:w-60">
@@ -156,14 +160,12 @@ export function Sidebar() {
         href="/dashboard"
         className="flex h-16 shrink-0 items-center justify-center gap-2.5 border-b border-slate-800 px-2 outline-none focus-visible:bg-slate-800 lg:justify-start lg:px-4"
       >
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] bg-gradient-to-br from-emerald-500 to-teal-600 text-[15px] font-extrabold text-white">
-          JM
-        </span>
+        <LogoMark size={34} className="shrink-0" />
         <span className="hidden min-w-0 flex-col lg:flex">
           <span className="truncate text-[15px] font-bold leading-tight text-white">
             JeniMc<span className="text-emerald-400">Rich</span>
           </span>
-          <span className="text-[10px] font-semibold tracking-[0.18em] text-slate-400">
+          <span className="text-[10px] font-semibold tracking-[0.14em] text-slate-400">
             RECRUITMENT
           </span>
         </span>
@@ -195,14 +197,21 @@ export function Sidebar() {
         })}
       </nav>
 
-      {/* Foot: data-source status (Supabase not provisioned yet) */}
+      {/* Foot: data-source status — reflects whether Supabase is wired up. */}
       <div
         className="flex h-12 shrink-0 items-center justify-center gap-2 border-t border-slate-800 px-2 lg:justify-start lg:px-4"
-        title="Running on built-in demo data — Supabase is not connected yet"
+        title={
+          liveData
+            ? "Connected to Supabase — changes persist to the database"
+            : "Running on built-in demo data — Supabase is not connected yet"
+        }
       >
-        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400" aria-hidden="true" />
-        <span className="hidden text-[11px] font-medium text-slate-500 lg:inline">
-          Demo data mode
+        <span
+          className={`h-1.5 w-1.5 shrink-0 rounded-full ${liveData ? "bg-emerald-500" : "bg-amber-400"}`}
+          aria-hidden="true"
+        />
+        <span className="hidden text-[11px] font-medium text-slate-400 lg:inline">
+          {liveData ? "Supabase connected" : "Demo data mode"}
         </span>
       </div>
     </aside>

@@ -7,13 +7,13 @@ export type ButtonSize = "sm" | "md";
 
 const variantClass: Record<ButtonVariant, string> = {
   primary:
-    "bg-primary text-white hover:bg-primary-strong focus-visible:ring-primary-soft",
+    "bg-primary text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.16)] hover:bg-primary-strong focus-visible:ring-primary-soft",
   secondary:
-    "bg-slate-800 text-white hover:bg-sidebar focus-visible:ring-slate-300",
+    "bg-slate-800 text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.1)] hover:bg-sidebar focus-visible:ring-slate-300",
   ghost:
     "border border-slate-300 bg-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-800 focus-visible:ring-primary-soft",
   danger:
-    "bg-danger text-white hover:bg-danger-strong focus-visible:ring-danger-soft",
+    "bg-danger text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.16)] hover:bg-danger-strong focus-visible:ring-danger-soft",
 };
 
 const sizeClass: Record<ButtonSize, string> = {
@@ -51,7 +51,7 @@ export function Button({
       disabled={disabled || loading}
       aria-busy={loading || undefined}
       className={cn(
-        "inline-flex items-center justify-center rounded-control font-semibold outline-none transition-colors duration-150 focus-visible:ring-[3px] disabled:pointer-events-none disabled:opacity-55",
+        "inline-flex items-center justify-center rounded-control font-semibold outline-none transition-[transform,background-color,box-shadow,color,border-color] duration-150 will-change-transform hover:-translate-y-px active:translate-y-0 focus-visible:ring-[3px] disabled:pointer-events-none disabled:opacity-55 disabled:hover:translate-y-0 motion-reduce:hover:translate-y-0 motion-reduce:transition-colors",
         variantClass[variant],
         sizeClass[size],
         block && "w-full",

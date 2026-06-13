@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Badge, DataTable, EmptyState, type DataTableColumn } from "@/components/ui";
+import { Badge, DataTable, EmptyState, Icon, type DataTableColumn } from "@/components/ui";
 import {
   JOB_STATUS_LABELS,
   VISA_LABELS,
@@ -142,7 +142,7 @@ export function JobsTable({ rows }: { rows: JobRow[] }) {
       onRowClick={(row) => router.push(`/jobs/${row.id}`)}
       empty={
         <EmptyState
-          icon="💼"
+          icon={<Icon name="jobs" size={22} className="text-slate-400" />}
           title="No job listings yet"
           hint="Create your first listing — paste a JD into the New job form and auto-fill does the heavy lifting."
         />

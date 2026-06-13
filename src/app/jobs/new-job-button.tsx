@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   Button,
   FieldError,
+  Icon,
   Input,
   Label,
   Modal,
@@ -177,8 +178,8 @@ export function NewJobButton({ clientNames, skillDictionary }: NewJobButtonProps
   return (
     <div className="flex items-center gap-3">
       {createdTitle ? (
-        <span className="text-xs font-semibold text-primary-ink" role="status">
-          ✓ “{createdTitle}” created
+        <span className="inline-flex items-center gap-1 text-xs font-semibold text-primary-ink" role="status">
+          <Icon name="check" size={14} /> “{createdTitle}” created
         </span>
       ) : null}
       <Button onClick={openModal}>+ New job</Button>
@@ -212,8 +213,8 @@ export function NewJobButton({ clientNames, skillDictionary }: NewJobButtonProps
           {/* JD auto-fill */}
           <div className="mb-5 rounded-card border border-primary-soft bg-primary-faint p-3.5">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-[13px] font-semibold text-primary-ink">
-                ⚡ Auto-fill from a job description
+              <p className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-primary-ink">
+                <Icon name="bolt" size={15} /> Auto-fill from a job description
               </p>
               <Button size="sm" onClick={autofill}>
                 Auto-fill blanks
@@ -369,7 +370,7 @@ export function NewJobButton({ clientNames, skillDictionary }: NewJobButtonProps
                     aria-label={`Remove skill ${index + 1}`}
                     className="shrink-0 px-2"
                   >
-                    ✕
+                    <Icon name="close" size={15} />
                   </Button>
                 </div>
               ))}

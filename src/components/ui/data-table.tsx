@@ -124,7 +124,7 @@ export function DataTable<T>({
   const cellPad = dense ? "px-3 py-2" : "px-3 py-[11px]";
 
   return (
-    <div className={cn("overflow-x-auto scrollbar-slim", className)}>
+    <div className={cn("overflow-x-auto scrollbar-slim scroll-shadow-x", className)}>
       <table aria-label={ariaLabel} className="w-full border-collapse">
         <thead>
           <tr className="border-b border-slate-200 bg-slate-50">

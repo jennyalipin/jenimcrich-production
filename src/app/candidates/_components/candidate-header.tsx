@@ -7,6 +7,7 @@ import {
   Button,
   Card,
   CardBody,
+  Icon,
   Input,
   Modal,
   ScorePill,
@@ -133,11 +134,11 @@ export function CandidateHeader({ data }: { data: CandidateHeaderData }) {
                     aria-label={data.flagged ? "Remove priority flag" : "Flag as priority"}
                     title={data.flagged ? "Remove priority flag" : "Flag as priority"}
                     className={cn(
-                      "rounded text-lg leading-none outline-none transition-transform hover:scale-110 focus-visible:ring-2 focus-visible:ring-primary-soft",
-                      data.flagged ? "" : "opacity-30 grayscale hover:opacity-60",
+                      "rounded leading-none outline-none transition-transform hover:scale-110 focus-visible:ring-2 focus-visible:ring-primary-soft",
+                      data.flagged ? "text-amber-400" : "text-slate-300 hover:text-amber-300",
                     )}
                   >
-                    ⭐
+                    <Icon name="star" size={20} fill={data.flagged} />
                   </button>
                   {data.primary?.restrictiveVisa && data.primary.visaLabel ? (
                     <Badge variant="visa" title="Restrictive work-authorization requirement on the applied role">
@@ -209,14 +210,16 @@ export function CandidateHeader({ data }: { data: CandidateHeaderData }) {
                 {data.interviewAvg !== null ? (
                   <span
                     title="Weighted interview average across all scorecards"
-                    className="inline-flex min-w-11 items-center justify-center rounded-full bg-primary-soft px-3 py-1 text-[15px] font-extrabold tabular-nums text-primary-ink"
+                    className="inline-flex min-w-11 items-center justify-center gap-1 rounded-full bg-primary-soft px-3 py-1 text-[15px] font-extrabold tabular-nums text-primary-ink"
                   >
-                    {data.interviewAvg}★<span className="sr-only">interview average out of 5</span>
+                    {data.interviewAvg}
+                    <Icon name="star" size={14} fill className="text-primary-ink" />
+                    <span className="sr-only">interview average out of 5</span>
                   </span>
                 ) : null}
               </div>
               {data.primary !== null || data.interviewAvg !== null ? (
-                <p className="text-[11.5px] text-slate-400">
+                <p className="text-[11.5px] text-slate-500">
                   {data.primary ? "match score" : ""}
                   {data.primary && data.interviewAvg !== null ? " · " : ""}
                   {data.interviewAvg !== null ? "interview avg" : ""}
@@ -252,43 +255,48 @@ export function CandidateHeader({ data }: { data: CandidateHeaderData }) {
           {/* Fact grid */}
           <div className="mt-5 grid grid-cols-2 gap-4 border-t border-slate-100 pt-4 lg:grid-cols-4">
             <div>
-              <p className="micro-label text-slate-400">Applied role</p>
+              <p className="micro-label text-slate-500">Applied role</p>
               {data.primary ? (
                 <>
                   <p className="text-[13px] font-semibold text-slate-800">{data.primary.jobTitle}</p>
-                  <p className="text-[12px] text-slate-400">
+                  <p className="text-[12px] text-slate-500">
                     {data.primary.clientName}
                     {data.extraApplications > 0 ? ` · +${data.extraApplications} more` : ""}
                   </p>
                 </>
               ) : (
-                <p className="text-[13px] text-slate-400">No applications yet</p>
+                <p className="text-[13px] text-slate-500">No applications yet</p>
               )}
             </div>
             <div>
-              <p className="micro-label text-slate-400">Stage</p>
+              <p className="micro-label text-slate-500">Stage</p>
               {data.primary ? (
                 <p className="flex items-center gap-2">
                   <StageBadge stage={data.primary.stage} />
                   <span
                     className={cn(
-                      "text-[12px] tabular-nums",
-                      data.primary.isStalled ? "font-bold text-warning-ink" : "text-slate-400",
+                      "inline-flex items-center gap-1 text-[12px] tabular-nums",
+                      data.primary.isStalled ? "font-bold text-warning-ink" : "text-slate-500",
                     )}
                   >
-                    {data.primary.daysInStage}d{data.primary.isStalled ? " ⚠ stalled" : ""}
+                    {data.primary.daysInStage}d
+                    {data.primary.isStalled ? (
+                      <>
+                        <Icon name="stalled" size={13} className="text-warning-ink" /> stalled
+                      </>
+                    ) : null}
                   </span>
                 </p>
               ) : (
-                <p className="text-[13px] text-slate-400">—</p>
+                <p className="text-[13px] text-slate-500">—</p>
               )}
             </div>
             <div>
-              <p className="micro-label text-slate-400">Expected salary</p>
+              <p className="micro-label text-slate-500">Expected salary</p>
               <p className="text-[13px] font-semibold text-slate-800">{data.expectedSalary || "—"}</p>
             </div>
             <div>
-              <p className="micro-label text-slate-400">Notice period</p>
+              <p className="micro-label text-slate-500">Notice period</p>
               <p className="text-[13px] font-semibold text-slate-800">{data.noticePeriod || "—"}</p>
             </div>
           </div>

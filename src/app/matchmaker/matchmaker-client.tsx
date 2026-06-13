@@ -11,6 +11,7 @@ import {
   CardTitle,
   EmptyState,
   FieldError,
+  Icon,
   Label,
   Select,
   Spinner,
@@ -299,9 +300,11 @@ function CandidateToJobs({ jobs, candidates, skillDictionary }: MatchmakerClient
                 </option>
               ))}
             </Select>
-            <p className="mt-2 text-[12px] text-slate-500">
+            <p className="mt-2 inline-flex flex-wrap items-center gap-1 text-[12px] text-slate-500">
               Cross-references against <b>{jobs.length} active JD{jobs.length === 1 ? "" : "s"}</b>{" "}
-              with weighted skill scoring (★ skills count 3×).
+              with weighted skill scoring (
+              <Icon name="star" size={11} fill aria-hidden className="text-warning" /> skills count
+              3×).
             </p>
           </CardBody>
         </Card>
@@ -317,7 +320,7 @@ function CandidateToJobs({ jobs, candidates, skillDictionary }: MatchmakerClient
             {jobs.length === 0 ? (
               <Card>
                 <EmptyState
-                  icon="💼"
+                  icon={<Icon name="jobs" size={20} className="text-slate-400" />}
                   title="No open jobs to rank against"
                   hint="Open a job listing first, then come back to rank this candidate."
                   action={
@@ -362,7 +365,7 @@ function CandidateToJobs({ jobs, candidates, skillDictionary }: MatchmakerClient
         ) : (
           <Card>
             <EmptyState
-              icon="🎯"
+              icon={<Icon name="target" size={20} className="text-slate-400" />}
               title="Pick a candidate or paste a resume"
               hint="You'll get ranked matches against every open role — with pros, gaps and “the edge”."
             />
@@ -388,8 +391,10 @@ function SubjectSummary({ subject }: { subject: Subject }) {
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <h2 className="flex flex-wrap items-center gap-2 text-[15px] font-semibold text-ink">
-              <span className="truncate">
-                {isExisting && subject.candidate.flagged ? "⭐ " : ""}
+              <span className="flex items-center gap-1 truncate">
+                {isExisting && subject.candidate.flagged ? (
+                  <Icon name="star" size={15} fill aria-label="Flagged candidate" className="shrink-0 text-warning" />
+                ) : null}
                 {name}
               </span>
               {!isExisting ? <Badge variant="info">Parsed from pasted text</Badge> : null}
@@ -485,7 +490,7 @@ function JobToCandidates({ jobs, candidates }: Pick<MatchmakerClientProps, "jobs
 
           {jobs.length === 0 ? (
             <EmptyState
-              icon="💼"
+              icon={<Icon name="jobs" size={20} className="text-slate-400" />}
               title="No open jobs"
               hint="Open a job listing first — only open roles can be matched."
               action={
@@ -529,12 +534,19 @@ function JobToCandidates({ jobs, candidates }: Pick<MatchmakerClientProps, "jobs
                 <div className="mt-1.5 flex flex-wrap gap-1.5">
                   {job.skills.map((skill) => (
                     <Badge key={skill.skill} variant="info" title={`Weight ${skill.weight}`}>
-                      {skill.skill}
-                      {skill.weight >= 3 ? " ★" : ""}
+                      <span className="inline-flex items-center gap-1">
+                        {skill.skill}
+                        {skill.weight >= 3 ? (
+                          <Icon name="star" size={11} fill aria-label="Must-have skill" className="text-warning" />
+                        ) : null}
+                      </span>
                     </Badge>
                   ))}
                 </div>
-                <p className="mt-1.5 text-[11.5px] text-slate-400">★ = must-have (weight 3)</p>
+                <p className="mt-1.5 inline-flex items-center gap-1 text-[11.5px] text-slate-400">
+                  <Icon name="star" size={11} fill aria-hidden className="text-warning" /> = must-have
+                  (weight 3)
+                </p>
               </div>
             </div>
           ) : null}
@@ -546,7 +558,7 @@ function JobToCandidates({ jobs, candidates }: Pick<MatchmakerClientProps, "jobs
         {!job ? (
           <Card>
             <EmptyState
-              icon="🧲"
+              icon={<Icon name="matchmaker" size={20} className="text-slate-400" />}
               title="Pick a job to rank candidates"
               hint="Every active candidate is scored against the JD's weighted skills, experience bar and certifications."
             />
@@ -554,7 +566,7 @@ function JobToCandidates({ jobs, candidates }: Pick<MatchmakerClientProps, "jobs
         ) : ranked.length === 0 ? (
           <Card>
             <EmptyState
-              icon="👥"
+              icon={<Icon name="candidates" size={20} className="text-slate-400" />}
               title="No candidates to rank"
               hint="Add candidates first, then come back to find the best fits."
               action={

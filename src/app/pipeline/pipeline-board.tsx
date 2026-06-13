@@ -22,6 +22,7 @@ import { useMemo, useOptimistic, useRef, useState, useTransition } from "react";
 import {
   Button,
   EmptyState,
+  Icon,
   ScorePill,
   Select,
   ToastProvider,
@@ -42,7 +43,7 @@ export interface BoardCard {
   candidateName: string;
   flagged: boolean;
   jobTitle: string;
-  /** Job has a restrictive visa requirement → render 🛂 (domain rule 4). */
+  /** Job has a restrictive visa requirement → render visa icon (domain rule 4). */
   restrictiveVisa: boolean;
   /** Match score vs this card's own job (domain rule 2). */
   score: number;
@@ -245,7 +246,7 @@ function BoardInner({ cards: initialCards, jobs, stalledDays, stalledEnabled }: 
       {visibleCards.length === 0 ? (
         <div className="rounded-card border border-slate-200 bg-surface shadow-card">
           <EmptyState
-            icon="🗂️"
+            icon={<Icon name="archive" size={20} className="text-slate-400" />}
             title={filteringJob ? "No candidates for this job yet" : "No applications yet"}
             hint={
               filteringJob
@@ -385,13 +386,15 @@ function CardFace({ card, overlay = false }: { card: BoardCard; overlay?: boolea
     <article
       className={cn(
         "cursor-grab rounded-[10px] border border-slate-200 bg-surface px-3 py-2.5 shadow-card active:cursor-grabbing",
-        card.isStalled && "border-l-[3px] border-l-warning ring-1 ring-warning-soft",
+        card.isStalled && "ring-1 ring-warning-soft",
         overlay && "shadow-raised",
       )}
     >
       <div className="flex items-center justify-between gap-2">
-        <span className="truncate text-[13px] font-bold text-ink">
-          {card.flagged ? <span aria-label="Flagged candidate">⭐ </span> : null}
+        <span className="flex items-center gap-1 truncate text-[13px] font-bold text-ink">
+          {card.flagged ? (
+            <Icon name="star" size={13} fill aria-label="Flagged candidate" className="shrink-0 text-warning" />
+          ) : null}
           {/* Real link so keyboard users can open the profile (Enter on the
               card itself lifts it for dragging). */}
           <Link
@@ -409,19 +412,24 @@ function CardFace({ card, overlay = false }: { card: BoardCard; overlay?: boolea
           label={`Match score for ${card.jobTitle}`}
         />
       </div>
-      <div className="mt-0.5 truncate text-[11.5px] text-slate-500">
-        {card.jobTitle}
+      <div className="mt-0.5 flex items-center gap-1 text-[11.5px] text-slate-500">
+        <span className="truncate">{card.jobTitle}</span>
         {card.restrictiveVisa ? (
-          <span title="Restrictive visa requirement on this job" aria-label="Restrictive visa requirement">
-            {" "}
-            🛂
-          </span>
+          <Icon
+            name="visa"
+            size={13}
+            aria-label="Restrictive visa requirement"
+            className="shrink-0 text-warning-ink"
+          />
         ) : null}
       </div>
       <div className="mt-1.5 flex items-center justify-between text-[11px]">
         <span className="tabular-nums text-slate-400">{card.daysInStage}d in stage</span>
         {card.isStalled ? (
-          <span className="font-bold text-warning-ink">⚠ stalled</span>
+          <span className="inline-flex items-center gap-1 font-bold text-warning-ink">
+            <Icon name="stalled" size={12} aria-hidden />
+            stalled
+          </span>
         ) : null}
       </div>
     </article>

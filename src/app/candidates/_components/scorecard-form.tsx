@@ -8,6 +8,7 @@ import {
   CardHeader,
   CardTitle,
   FieldError,
+  Icon,
   Label,
   Select,
   Textarea,
@@ -37,7 +38,7 @@ function StarRating({
   return (
     <div className="flex items-center justify-between gap-3 border-b border-slate-100 py-1.5 last:border-b-0">
       <span className="text-[13px] text-slate-600">
-        {label} <span className="text-[11px] text-slate-400">(w{weight})</span>
+        {label} <span className="text-[11px] text-slate-500">(w{weight})</span>
       </span>
       <span
         role="radiogroup"
@@ -53,11 +54,11 @@ function StarRating({
             aria-label={`${n} of 5`}
             onClick={() => onChange(value === n ? 0 : n)}
             className={cn(
-              "rounded text-[17px] leading-none outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary-soft",
+              "rounded leading-none outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary-soft",
               n <= value ? "text-amber-400" : "text-slate-200 hover:text-amber-200",
             )}
           >
-            ★
+            <Icon name="star" size={17} fill={n <= value} />
           </button>
         ))}
       </span>
