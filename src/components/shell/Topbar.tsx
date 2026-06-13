@@ -55,7 +55,11 @@ function useDropdown(): {
       }
     };
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
+      if (event.key === "Escape") {
+        setOpen(false);
+        // Return focus to the trigger so keyboard users aren't dropped.
+        ref.current?.querySelector<HTMLButtonElement>("button")?.focus();
+      }
     };
     document.addEventListener("pointerdown", onPointerDown);
     document.addEventListener("keydown", onKeyDown);
@@ -220,6 +224,7 @@ function UserMenu() {
     <div ref={ref} className="relative">
       <button
         type="button"
+        aria-label={`User menu — ${DEMO_USER.name}, ${DEMO_USER.role}`}
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen(!open)}
@@ -318,7 +323,10 @@ export function Topbar({ title }: { title?: string }) {
           placeholder="Search candidates, jobs…"
           className="h-9 w-full rounded-lg border border-white/10 bg-white/5 pl-9 pr-11 text-[13px] text-slate-100 outline-none transition-colors placeholder:text-slate-500 focus:border-emerald-500/60 focus:bg-white/10 focus:ring-2 focus:ring-emerald-500/30"
         />
-        <kbd className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 rounded border border-white/10 px-1.5 py-0.5 font-mono text-[10px] text-slate-500">
+        <kbd
+          aria-hidden="true"
+          className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 rounded border border-white/10 px-1.5 py-0.5 font-mono text-[10px] text-slate-500"
+        >
           ⌘K
         </kbd>
       </div>
