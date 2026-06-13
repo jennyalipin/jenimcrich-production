@@ -26,6 +26,7 @@ import {
   LayoutDashboard,
   LogOut,
   Mail,
+  Menu,
   Magnet,
   Paperclip,
   Plus,
@@ -76,6 +77,7 @@ const ICONS = {
   verified: BadgeCheck,
   bell: Bell,
   logout: LogOut,
+  menu: Menu,
   // generic ui
   search: Search,
   close: X,

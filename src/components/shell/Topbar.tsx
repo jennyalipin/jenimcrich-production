@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { signOut } from "@/app/(auth)/login/actions";
 import { CommandPalette } from "./CommandPalette";
+import { MobileNav } from "./MobileNav";
 
 /**
  * Dark topbar: page title (derived from the route, overridable via `title`),
@@ -311,6 +312,7 @@ export function Topbar({ title }: { title?: string }) {
 
   return (
     <header className="relative z-40 flex h-16 shrink-0 items-center gap-3 border-b border-slate-800 bg-[#0f172a] px-4 lg:px-6">
+      <MobileNav />
       <h1 className="min-w-0 flex-1 truncate text-[17px] font-semibold tracking-tight text-white">
         {pageTitle}
       </h1>

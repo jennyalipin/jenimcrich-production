@@ -154,7 +154,7 @@ export function Sidebar() {
   const liveData = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
 
   return (
-    <aside className="flex h-full w-16 shrink-0 flex-col border-r border-slate-800 bg-[#0f172a] lg:w-60">
+    <aside className="hidden h-full w-16 shrink-0 flex-col border-r border-slate-800 bg-[#0f172a] md:flex lg:w-60">
       {/* Brand */}
       <Link
         href="/dashboard"
