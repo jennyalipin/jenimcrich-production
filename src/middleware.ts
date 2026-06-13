@@ -27,6 +27,11 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const loginRoute = isLogin(pathname);
 
+  // The OAuth callback must run before a session exists — never gate it.
+  if (pathname.startsWith("/auth/")) {
+    return NextResponse.next();
+  }
+
   if (isSupabaseConfigured()) {
     const { response, user } = await updateSession(request);
 
