@@ -9,6 +9,7 @@ import {
   CardTitle,
   EmptyState,
   FieldError,
+  Icon,
   Input,
   Label,
   Modal,
@@ -170,9 +171,9 @@ export function TemplatesView({ templates: initialTemplates, recipients, emailLo
               <code key={field} className={chipClass}>{`{{${field}}}`}</code>
             ))}
           </div>
-          <p className="text-[12px] text-slate-400">
-            Demo data mode — template edits live in this session. Bulk sending
-            activates once Resend is connected.
+          <p className="text-[12px] text-slate-500">
+            The template library loads from the database; edits apply for this
+            session and bulk sending activates once Resend email is connected.
           </p>
         </div>
         <div className="flex shrink-0 gap-2">
@@ -181,7 +182,7 @@ export function TemplatesView({ templates: initialTemplates, recipients, emailLo
             onClick={() => setBulkOpen(true)}
             disabled={templates.length === 0}
           >
-            <span aria-hidden="true">✉️</span> Bulk email
+            <Icon name="email" size={15} /> Bulk email
           </Button>
           <Button onClick={() =>
             setEditor({ id: null, name: "", category: "update", subject: "", body: "" })
@@ -195,7 +196,7 @@ export function TemplatesView({ templates: initialTemplates, recipients, emailLo
         <Card>
           <EmptyState
             className="py-14"
-            icon={<span aria-hidden="true">✉️</span>}
+            icon={<Icon name="email" size={22} className="text-slate-400" />}
             title="No templates yet"
             hint="Create your first email template — merge fields personalize it per candidate."
             action={
@@ -733,7 +734,7 @@ function EmailLogCard({ rows }: { rows: EmailLogRow[] }) {
       {rows.length === 0 ? (
         <EmptyState
           className="py-12"
-          icon={<span aria-hidden="true">📭</span>}
+          icon={<Icon name="empty" size={22} className="text-slate-400" />}
           title="No emails logged yet"
           hint="Bulk sends and interview confirmations will appear here."
         />

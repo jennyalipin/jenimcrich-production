@@ -2,17 +2,9 @@
 
 import Link from "next/link";
 import { useId, useState, type ReactNode } from "react";
-import { Badge, Card, CardBody, ScorePill, cn } from "@/components/ui";
-import { scoreBand } from "@/lib/scoring";
-import type { MatchResult, ScoreBand, ScoreCandidateInput, ScoreJobInput } from "@/lib/types";
+import { Badge, Card, CardBody, Icon, ScorePill, cn } from "@/components/ui";
+import type { MatchResult, ScoreCandidateInput, ScoreJobInput } from "@/lib/types";
 import { explainScore, round1 } from "./explain";
-
-/* Prototype .match-card: 4px left border colored by score band. */
-const bandBorder: Record<ScoreBand, string> = {
-  high: "border-l-primary",
-  mid: "border-l-warning",
-  low: "border-l-danger",
-};
 
 const LIST_LIMIT = 4;
 
@@ -50,19 +42,20 @@ export function MatchCard({
 }: MatchCardProps) {
   const [expanded, setExpanded] = useState(false);
   const panelId = useId();
-  const band = scoreBand(match.score);
 
   const pros = match.pros.slice(0, LIST_LIMIT);
   const cons = match.cons.slice(0, LIST_LIMIT);
   const moreCount = Math.max(match.pros.length - LIST_LIMIT, 0);
 
   return (
-    <Card className={cn("border-l-4", bandBorder[band])}>
+    <Card>
       <CardBody className="p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="truncate text-[14px] font-bold text-ink">
-              {flagged ? <span aria-label="Flagged candidate">⭐ </span> : null}
+            <p className="flex items-center gap-1 truncate text-[14px] font-bold text-ink">
+              {flagged ? (
+                <Icon name="star" size={14} fill aria-label="Flagged candidate" className="shrink-0 text-warning" />
+              ) : null}
               {title}
             </p>
             <p className="mt-0.5 text-[12px] text-slate-500">{subtitle}</p>
@@ -72,8 +65,11 @@ export function MatchCard({
         </div>
 
         {match.edge ? (
-          <div className="mt-3 rounded-control border border-primary-soft bg-gradient-to-r from-primary-faint to-white px-3 py-2 text-[13px] text-slate-700">
-            ⚡ <span className="font-semibold">The Edge:</span> {match.edge}
+          <div className="mt-3 flex items-start gap-1.5 rounded-control border border-primary-soft bg-gradient-to-r from-primary-faint to-white px-3 py-2 text-[13px] text-slate-700">
+            <Icon name="bolt" size={15} className="mt-0.5 shrink-0 text-primary" />
+            <span>
+              <span className="font-semibold">The Edge:</span> {match.edge}
+            </span>
           </div>
         ) : null}
 
@@ -102,9 +98,7 @@ export function MatchCard({
               {cons.length > 0 ? (
                 cons.map((con) => (
                   <li key={con} className="flex gap-2">
-                    <span aria-hidden="true" className="font-bold text-danger">
-                      ✕
-                    </span>
+                    <Icon name="close" size={14} aria-hidden className="mt-0.5 shrink-0 text-danger" />
                     <span>{con}</span>
                   </li>
                 ))

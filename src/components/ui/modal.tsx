@@ -4,11 +4,13 @@ import {
   useEffect,
   useId,
   useRef,
-  useState,
+  useSyncExternalStore,
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "./cn";
+
+const noopSubscribe = () => () => {};
 
 const FOCUSABLE_SELECTOR =
   'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -41,14 +43,17 @@ export function Modal({
   size = "md",
   closeOnBackdrop = true,
 }: ModalProps) {
-  const [mounted, setMounted] = useState(false);
+  // Portals require document.body, so render nothing until mounted on the
+  // client. useSyncExternalStore gives the server snapshot (false) during SSR
+  // and the client snapshot (true) after hydration — no setState in an effect.
+  const mounted = useSyncExternalStore(
+    noopSubscribe,
+    () => true,
+    () => false,
+  );
   const panelRef = useRef<HTMLDivElement | null>(null);
   const pressedBackdrop = useRef(false);
   const titleId = useId();
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -61,7 +66,12 @@ export function Modal({
     const frame = requestAnimationFrame(() => {
       const panel = panelRef.current;
       if (!panel) return;
-      const first = panel.querySelector<HTMLElement>(FOCUSABLE_SELECTOR);
+      // Prefer the first focusable in the body (a real field) over the header
+      // close button, which is first in DOM order.
+      const body = panel.querySelector<HTMLElement>("[data-modal-body]");
+      const first =
+        body?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR) ??
+        panel.querySelector<HTMLElement>(FOCUSABLE_SELECTOR);
       (first ?? panel).focus();
     });
 
@@ -103,7 +113,9 @@ export function Modal({
       cancelAnimationFrame(frame);
       document.removeEventListener("keydown", handleKeyDown, true);
       document.body.style.overflow = previousOverflow;
-      previouslyFocused?.focus();
+      // Restore focus to the trigger after the portal unmounts, otherwise the
+      // browser parks focus on <body> and keyboard users lose their place.
+      requestAnimationFrame(() => previouslyFocused?.focus());
     };
   }, [open, onClose]);
 
@@ -152,7 +164,9 @@ export function Modal({
             </svg>
           </button>
         </div>
-        <div className="max-h-[65vh] overflow-y-auto px-5 py-5 scrollbar-slim">{children}</div>
+        <div data-modal-body className="max-h-[65vh] overflow-y-auto px-5 py-5 scrollbar-slim">
+          {children}
+        </div>
         {footer ? (
           <div className="flex items-center justify-end gap-2.5 border-t border-slate-200 px-5 py-3.5">
             {footer}

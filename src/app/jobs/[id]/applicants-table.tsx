@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import {
   DataTable,
   EmptyState,
+  Icon,
   ScorePill,
   StageBadge,
   type DataTableColumn,
@@ -31,11 +32,14 @@ const columns: ReadonlyArray<DataTableColumn<ApplicantRow>> = [
     key: "name",
     header: "Candidate",
     cell: (row) => (
-      <span className="font-semibold text-ink">
+      <span className="inline-flex items-center font-semibold text-ink">
         {row.flagged ? (
-          <span aria-hidden="true" className="mr-1 text-warning" title="Flagged top candidate">
-            ⚑
-          </span>
+          <Icon
+            name="flag"
+            size={14}
+            className="mr-1 text-warning-ink"
+            label="Flagged top candidate"
+          />
         ) : null}
         {row.name}
       </span>
@@ -63,10 +67,11 @@ const columns: ReadonlyArray<DataTableColumn<ApplicantRow>> = [
     cell: (row) =>
       row.is_stalled ? (
         <span
-          className="font-semibold tabular-nums text-warning-ink"
+          className="inline-flex items-center justify-end gap-1 font-semibold tabular-nums text-warning-ink"
           title="Stalled — no activity recently"
         >
-          {formatDaysCompact(row.days_in_stage)} ⚠
+          {formatDaysCompact(row.days_in_stage)}
+          <Icon name="stalled" size={13} className="text-warning-ink" />
         </span>
       ) : (
         <span className="tabular-nums text-slate-500">{formatDaysCompact(row.days_in_stage)}</span>
@@ -94,7 +99,7 @@ export function ApplicantsTable({ rows }: { rows: ApplicantRow[] }) {
       dense
       empty={
         <EmptyState
-          icon="🎯"
+          icon={<Icon name="target" size={22} className="text-slate-400" />}
           title="No applicants yet"
           hint="Candidates linked to this job will appear here, ranked by match score."
         />

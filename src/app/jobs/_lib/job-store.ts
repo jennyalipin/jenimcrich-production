@@ -22,6 +22,8 @@ import {
   type Stage,
   type VisaType,
 } from "@/lib/data/types";
+import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { sbAddJobNote, sbCreateJob, sbGetJobNotes } from "@/lib/data/supabase-mutations";
 
 if (typeof window !== "undefined") {
   throw new Error(
@@ -133,17 +135,67 @@ function store(): JobOverlayStore {
 /* Jobs                                                                 */
 /* ------------------------------------------------------------------ */
 
-/** Jobs created in this demo session (newest first). */
+function emptyStageCounts(): Record<Stage, number> {
+  return Object.fromEntries(STAGES.map((stage) => [stage, 0])) as Record<Stage, number>;
+}
+
+/**
+ * Locally-created jobs. With Supabase live this overlay is empty — every job
+ * (new ones included) comes from the main data layer's hydrated store, so the
+ * /jobs page's `[...getJobs(), ...listLocalJobs()]` concatenation stays correct.
+ */
 export async function listLocalJobs(): Promise<JobWithStats[]> {
+  if (await getSupabaseServerClient()) return [];
   return clone(store().jobs);
 }
 
 export async function getLocalJob(id: string): Promise<JobWithStats | null> {
+  if (await getSupabaseServerClient()) return null;
   const job = store().jobs.find((j) => j.id === id);
   return job ? clone(job) : null;
 }
 
 export async function createLocalJob(input: LocalJobInput): Promise<JobWithStats> {
+  const supabase = await getSupabaseServerClient();
+  if (supabase) {
+    const ts = nowIso();
+    const id = await sbCreateJob(supabase, {
+      title: input.title,
+      client_id: input.client_id,
+      location: input.location,
+      salary_range: input.salary_range,
+      min_years: input.min_years,
+      status: input.status,
+      visa: input.visa,
+      visa_notes: input.visa_notes,
+      skills: input.skills,
+      requirements: input.requirements,
+      description: input.description,
+      jd_text: input.jd_text,
+    });
+    return {
+      id,
+      client_id: input.client_id,
+      client_name: input.client_name,
+      title: input.title,
+      location: input.location,
+      salary_range: input.salary_range,
+      min_years: input.min_years,
+      description: input.description,
+      requirements: input.requirements,
+      status: input.status,
+      visa: input.visa,
+      visa_notes: input.visa_notes,
+      jd_text: input.jd_text,
+      skills: input.skills,
+      opened_at: ts,
+      created_at: ts,
+      updated_at: ts,
+      archived_at: null,
+      applicant_count: 0,
+      stage_counts: emptyStageCounts(),
+    };
+  }
   const s = store();
   s.seq += 1;
   const ts = nowIso();
@@ -183,6 +235,8 @@ export async function createLocalJob(input: LocalJobInput): Promise<JobWithStats
 
 /** Notes for a job (works for both seeded and locally created jobs), newest first. */
 export async function getJobNotes(jobId: string): Promise<JobNote[]> {
+  const supabase = await getSupabaseServerClient();
+  if (supabase) return sbGetJobNotes(supabase, jobId);
   return clone(store().notesByJob[jobId] ?? []);
 }
 
@@ -191,6 +245,11 @@ export async function addLocalJobNote(
   body: string,
   authorName: string,
 ): Promise<JobNote> {
+  const supabase = await getSupabaseServerClient();
+  if (supabase) {
+    const { id, created_at } = await sbAddJobNote(supabase, jobId, body);
+    return { id, job_id: jobId, author_name: authorName, body, created_at };
+  }
   const s = store();
   s.seq += 1;
   const note: JobNote = {

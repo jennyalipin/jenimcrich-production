@@ -2,11 +2,11 @@ import type { Metadata } from "next";
 import {
   getAnalytics,
   getApplicationsByStage,
-  REFERENCE_NOW,
+  displayNow,
   type AnalyticsData,
 } from "@/lib/data";
 import { formatDate } from "@/lib/format";
-import { Card, CardBody, CardHeader, CardTitle, EmptyState, cn } from "@/components/ui";
+import { Card, CardBody, CardHeader, CardTitle, EmptyState, Icon, cn } from "@/components/ui";
 import { FunnelChart } from "@/components/charts/funnel-chart";
 import { HiresPerMonthChart, type HiresDatum } from "@/components/charts/hires-per-month-chart";
 import { SourceDonutChart } from "@/components/charts/source-donut-chart";
@@ -20,11 +20,11 @@ export const metadata: Metadata = {
 
 const MONTHS_SHOWN = 6;
 
-/** Bucket hires into the last N calendar months (UTC) ending at REFERENCE_NOW. */
-function buildHiresPerMonth(hiredEnteredAt: readonly string[]): HiresDatum[] {
+/** Bucket hires into the last N calendar months (UTC) ending at `now`. */
+function buildHiresPerMonth(hiredEnteredAt: readonly string[], now: Date): HiresDatum[] {
   const monthFmt = new Intl.DateTimeFormat("en-US", { month: "short", timeZone: "UTC" });
-  const year = REFERENCE_NOW.getUTCFullYear();
-  const month = REFERENCE_NOW.getUTCMonth();
+  const year = now.getUTCFullYear();
+  const month = now.getUTCMonth();
 
   const buckets = Array.from({ length: MONTHS_SHOWN }, (_, i) => {
     const offset = MONTHS_SHOWN - 1 - i;
@@ -100,7 +100,8 @@ export default async function AnalyticsPage() {
     total: s.total,
     qualified: s.qualified,
   }));
-  const hiresData = buildHiresPerMonth(byStage.hired.map((app) => app.stage_entered_at));
+  const now = displayNow();
+  const hiresData = buildHiresPerMonth(byStage.hired.map((app) => app.stage_entered_at), now);
   const totalHiresShown = hiresData.reduce((sum, d) => sum + d.hires, 0);
   const counts = analytics.activity_counts;
 
@@ -110,7 +111,7 @@ export default async function AnalyticsPage() {
         <p className="text-[13px] text-slate-500">
           Live metrics computed from your pipeline data.
         </p>
-        <p className="text-xs text-slate-400">As of {formatDate(REFERENCE_NOW)}</p>
+        <p className="text-xs text-slate-500">As of {formatDate(now)}</p>
       </div>
 
       <section aria-labelledby="analytics-kpis">
@@ -165,7 +166,7 @@ export default async function AnalyticsPage() {
               <SourceDonutChart data={sourceData} />
             ) : (
               <EmptyState
-                icon="🧭"
+                icon={<Icon name="target" size={20} />}
                 title="No candidates yet"
                 hint="Source effectiveness appears once candidates enter the pipeline."
               />
@@ -198,7 +199,7 @@ export default async function AnalyticsPage() {
               <HiresPerMonthChart data={hiresData} />
             ) : (
               <EmptyState
-                icon="🏁"
+                icon={<Icon name="flag" size={20} />}
                 title="No hires in this window"
                 hint="Placements will chart here as candidates reach Hired."
               />

@@ -5,6 +5,7 @@ import {
   CardHeader,
   CardTitle,
   EmptyState,
+  Icon,
   badgeBaseClass,
   cn,
   type BadgeVariant,
@@ -31,8 +32,8 @@ const DAY_MS = 86_400_000;
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 
-/** Event chip + badge tint per interview type (violet = technical, like the
- *  Interview stage hue; emerald = final panel; blue = HR; amber = client). */
+/** Event chip + badge tint per interview type (cyan accent = technical, like
+ *  the Interview stage hue; emerald = final panel; blue = HR; amber = client). */
 const typeChipClass: Record<InterviewType, string> = {
   hr_interview: "bg-info-soft text-info-ink",
   technical: "bg-accent-soft text-accent-ink",
@@ -309,7 +310,7 @@ export default async function CalendarPage({
           </ul>
         ) : (
           <EmptyState
-            icon="📅"
+            icon={<Icon name="interview" size={20} />}
             title="No interviews this week"
             hint="Use Schedule interview to book a candidate into an interviewer's slot."
           />

@@ -77,19 +77,45 @@ function escapeRegExp(s: string): string {
  */
 export function detectVisa(text: string): VisaRequirement {
   const lo = text.toLowerCase();
-  if (/tn\s*(visa|status)/.test(lo)) {
+
+  // True when `pattern` appears inside a negated clause ("no … h-1b",
+  // "without sponsorship"). Bounded to the sentence so a negation elsewhere
+  // doesn't bleed across. Lets us treat "no H-1B sponsorship" as a denial,
+  // not an offer.
+  const negated = (pattern: RegExp): boolean =>
+    new RegExp(
+      `\\b(?:no|not|without|cannot|can't|won't|will\\s+not|unable\\s+to|do(?:es)?\\s+not)\\b[^.;\\n]*?${pattern.source}`,
+    ).test(lo);
+
+  // TN classification — accept "TN-1"/"TN1" (unambiguous) or "TN" qualified by
+  // a visa-context word. NOT a bare "TN" (would false-match the Tennessee
+  // state abbreviation, e.g. "Memphis, TN").
+  const tnMentioned =
+    /\btn-?1\b/.test(lo) ||
+    /\btn\s*(?:visa|status|classification|category|professional|permit)/.test(lo);
+  if (tnMentioned) {
     const canadiansOnly =
-      /canadian(s)?\s*(citizens?\s*)?only/.test(lo) ||
+      /canadian(?:s)?\s*(?:citizens?\s*)?only/.test(lo) ||
       (/canadian/.test(lo) && !/mexican/.test(lo));
     return canadiansOnly ? "TN_CANADIAN_ONLY" : "TN_CANADIAN_OR_MEXICAN";
   }
-  if (/green\s*card|us\s*citizens?\s*only|must\s*be\s*authorized\s*to\s*work\s*in\s*the\s*(us|u\.s)/.test(lo)) {
+
+  if (/green\s*card|us\s*citizens?\s*only|must\s*be\s*authorized\s*to\s*work\s*in\s*the\s*(?:us|u\.s)/.test(lo)) {
     return "US_CITIZEN_GC_ONLY";
   }
-  if (/h-?1b/.test(lo)) return "H1B_TRANSFER";
-  if (/sponsorship\s*(is\s*)?available|open\s*to\s*international/.test(lo)) {
+
+  // H-1B transfer accepted — but "no H-1B"/"no H-1B sponsorship" is a refusal.
+  if (/h-?1b/.test(lo) && !negated(/h-?1b/)) {
+    return "H1B_TRANSFER";
+  }
+
+  if (
+    /sponsorship\s*(?:is\s*)?available|open\s*to\s*international|will\s*sponsor|visa\s*sponsorship/.test(lo) &&
+    !negated(/sponsor/)
+  ) {
     return "SPONSORSHIP_AVAILABLE";
   }
+
   return "UNSPECIFIED";
 }
 

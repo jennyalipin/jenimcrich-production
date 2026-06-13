@@ -44,3 +44,15 @@ supabase/.temp
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# playwright MCP test artifacts
+.playwright-mcp/
+
+# font archives (extracted into src/app/fonts)
+*.zip
+# local screenshots
+/*.jpeg
+/*.png
+
+# local design reference screenshots
+/design-refs/

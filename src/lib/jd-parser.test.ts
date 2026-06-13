@@ -197,6 +197,34 @@ describe("detectVisa — branch coverage (prototype precedence: TN → US/GC →
       "US_CITIZEN_GC_ONLY",
     );
   });
+
+  // Regression: restrictive TN roles must NOT demote into the permissive H-1B
+  // bucket (compliance — the worst-case wrong direction).
+  it.each([
+    ["TN-1 visa for Canadian citizens only; no H-1B sponsorship", "TN_CANADIAN_ONLY"],
+    ["TN-1 status required. Canadians only.", "TN_CANADIAN_ONLY"],
+    ["TN1 visa, Canadians only", "TN_CANADIAN_ONLY"],
+    ["TN classification, Canadian or Mexican", "TN_CANADIAN_OR_MEXICAN"],
+  ] as const)("classifies restrictive TN phrasing %j → %s", (text, expected) => {
+    expect(detectVisa(text)).toBe(expected);
+  });
+
+  // Negated H-1B / sponsorship must not read as an offer.
+  it("treats 'no H-1B' as a refusal, not H1B_TRANSFER", () => {
+    expect(
+      detectVisa("Sponsorship is available for the right candidate. No H-1B though."),
+    ).toBe("SPONSORSHIP_AVAILABLE");
+    expect(detectVisa("Must be authorized to work in the US. No H1B sponsorship.")).toBe(
+      "US_CITIZEN_GC_ONLY",
+    );
+  });
+
+  // The Tennessee state abbreviation must not trigger TN-visa detection.
+  it("does not mistake the 'TN' state abbreviation for a TN visa", () => {
+    expect(detectVisa("On-site role in Memphis, TN. Local candidates preferred.")).toBe(
+      "UNSPECIFIED",
+    );
+  });
 });
 
 describe("DEFAULT_SKILL_DICTIONARY", () => {

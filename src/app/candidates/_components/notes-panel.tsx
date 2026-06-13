@@ -10,6 +10,7 @@ import {
   CardTitle,
   EmptyState,
   FieldError,
+  Icon,
   Input,
   Label,
   Select,
@@ -55,7 +56,7 @@ export function NotesPanel({ candidateId, notes }: { candidateId: string; notes:
         <CardHeader>
           <CardTitle>
             Notes &amp; feedback{" "}
-            <span className="text-[12px] font-normal text-slate-400">(visible to hiring team only)</span>
+            <span className="text-[12px] font-normal text-slate-500">(visible to hiring team only)</span>
           </CardTitle>
         </CardHeader>
         <CardBody className="space-y-3">
@@ -68,7 +69,7 @@ export function NotesPanel({ candidateId, notes }: { candidateId: string; notes:
           />
           {visible.length === 0 ? (
             <EmptyState
-              icon="📝"
+              icon={<Icon name="note" size={20} />}
               title={query ? "No notes match this search" : "No notes yet"}
               hint={query ? "Try a different keyword." : "Save screening calls, interview observations and follow-ups here."}
             />
@@ -81,7 +82,7 @@ export function NotesPanel({ candidateId, notes }: { candidateId: string; notes:
                       <Badge>{note.categoryLabel}</Badge>
                       <span className="text-[12.5px] font-semibold text-slate-700">{note.author}</span>
                     </span>
-                    <span className="text-[12px] text-slate-400">{note.when}</span>
+                    <span className="text-[12px] text-slate-500">{note.when}</span>
                   </div>
                   <p className="mt-2 whitespace-pre-wrap text-[13px] leading-relaxed text-slate-600">
                     {note.body}

@@ -7,13 +7,14 @@ import {
   CardBody,
   CardHeader,
   CardTitle,
+  Icon,
   ScorePill,
   cn,
 } from "@/components/ui";
 import {
   DataLayerError,
   JOB_STATUS_LABELS,
-  REFERENCE_NOW,
+  displayNow,
   STAGES,
   STAGE_LABELS,
   VISA_LABELS,
@@ -95,7 +96,7 @@ export default async function JobDetailPage({
   const total = applications.length;
   const avgScore =
     total > 0 ? Math.round(ranked.reduce((sum, r) => sum + r.match.score, 0) / total) : null;
-  const daysOpen = daysSince(job.opened_at, REFERENCE_NOW);
+  const daysOpen = daysSince(job.opened_at, displayNow());
   const reachedInterview = applications.filter((a) =>
     a.stage === "interview" || a.stage === "offer" || a.stage === "hired",
   ).length;
@@ -179,9 +180,7 @@ export default async function JobDetailPage({
               <ul className="mt-1.5 grid gap-x-6 gap-y-1 sm:grid-cols-2">
                 {job.requirements.map((req) => (
                   <li key={req} className="flex gap-2 text-[13px] text-slate-600">
-                    <span aria-hidden="true" className="mt-px text-primary">
-                      ✓
-                    </span>
+                    <Icon name="check" size={15} className="mt-0.5 shrink-0 text-primary" />
                     {req}
                   </li>
                 ))}
@@ -265,7 +264,12 @@ export default async function JobDetailPage({
           {/* Hiring-manager notes */}
           <Card>
             <CardHeader>
-              <CardTitle>📝 Hiring manager notes</CardTitle>
+              <CardTitle>
+              <span className="inline-flex items-center gap-1.5">
+                <Icon name="note" size={16} className="text-slate-500" />
+                Hiring manager notes
+              </span>
+            </CardTitle>
               <span className="text-xs text-slate-500">Visible to the hiring team only</span>
             </CardHeader>
             <CardBody>
@@ -313,12 +317,16 @@ export default async function JobDetailPage({
                       key={skill.skill}
                       className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-2.5 last:border-b-0"
                     >
-                      <span className="text-[13px] font-medium text-slate-700">
+                      <span className="inline-flex items-center text-[13px] font-medium text-slate-700">
                         {skill.skill}
                         {skill.weight === 3 ? (
-                          <span aria-hidden="true" className="ml-1 text-warning">
-                            ★
-                          </span>
+                          <Icon
+                            name="star"
+                            size={13}
+                            fill
+                            className="ml-1 text-warning"
+                            label="Must-have"
+                          />
                         ) : null}
                       </span>
                       <span className="flex items-center gap-2">

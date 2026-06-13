@@ -9,6 +9,7 @@
 
 @theme inline {
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-fraunces), ui-serif, Georgia, "Times New Roman", serif;
   --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", monospace;
 }
 
@@ -45,20 +46,30 @@
   --color-info-soft: #dbeafe;
   --color-info-ink: #1e40af;
 
-  /* Interview-stage violet */
-  --color-accent: #8b5cf6;
-  --color-accent-soft: #ede9fe;
-  --color-accent-ink: #5b21b6;
+  /* Interview-stage accent — cyan (deliberately not violet/indigo). */
+  --color-accent: #0891b2;
+  --color-accent-soft: #cffafe;
+  --color-accent-ink: #155e75;
 
-  /* ---- Radii (control 8 / card 12 / modal 14) ---- */
-  --radius-control: 0.5rem;
-  --radius-card: 0.75rem;
-  --radius-modal: 0.875rem;
+  /* ---- Radii — tight 6px controls, surfaces step up (Ashby-style) ---- */
+  --radius-control: 0.375rem; /* 6px */
+  --radius-card: 0.625rem; /* 10px */
+  --radius-modal: 0.875rem; /* 14px */
 
-  /* ---- Shadows (slate-tinted, never gray) ---- */
-  --shadow-card: 0 1px 3px rgb(15 23 42 / 0.08), 0 1px 2px rgb(15 23 42 / 0.06);
-  --shadow-raised: 0 4px 12px rgb(15 23 42 / 0.1), 0 2px 4px rgb(15 23 42 / 0.06);
-  --shadow-overlay: 0 10px 25px rgb(15 23 42 / 0.12), 0 4px 10px rgb(15 23 42 / 0.08);
+  /* ---- Shadows — soft, layered, neutral-cool (slate-tinted, never gray) ---- */
+  --shadow-card:
+    0 0 0 1px rgb(15 23 42 / 0.05), 0 1px 1px -0.5px rgb(42 51 70 / 0.04),
+    0 2px 2px -1.5px rgb(42 51 70 / 0.04), 0 4px 4px -2.5px rgb(42 51 70 / 0.04);
+  --shadow-raised:
+    0 0 0 1px rgb(15 23 42 / 0.05), 0 1px 1px -0.5px rgb(42 51 70 / 0.04),
+    0 3px 3px -1.5px rgb(42 51 70 / 0.05), 0 6px 6px -3px rgb(15 23 42 / 0.05),
+    0 12px 12px -6px rgb(15 23 42 / 0.05);
+  --shadow-overlay:
+    0 0 0 1px rgb(15 23 42 / 0.06), 0 6px 16px -6px rgb(15 23 42 / 0.18),
+    0 12px 28px -8px rgb(15 23 42 / 0.18);
+  /* emerald focus halo + recessed control inset */
+  --shadow-focus: 0 0 0 3px rgb(5 150 105 / 0.18);
+  --shadow-input-inset: inset 0 1px 2px rgb(15 23 42 / 0.06);
 
   /* ---- Motion ---- */
   --animate-toast-in: toast-in 0.25s ease both;
@@ -138,6 +149,32 @@
   text-transform: uppercase;
 }
 
+/* Ashby-style eyebrow / section label: small-caps, modest tracking, emerald.
+   Use to introduce a section above its heading (sparingly). */
+@utility eyebrow {
+  font-variant: all-small-caps;
+  letter-spacing: 0.06em;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+/* Display heading: tight tracking + heavier weight (the 575/-0.025em register
+   from the type system), for page/hero headings. */
+@utility heading-tight {
+  font-weight: 650;
+  letter-spacing: -0.022em;
+  line-height: 1.15;
+}
+
+/* Serif accent — Signifier, for the occasional editorial word in a heading. */
+@utility serif-accent {
+  font-family: var(--font-serif);
+  font-weight: 500;
+  font-style: italic;
+  letter-spacing: -0.01em;
+}
+
 /* Slim slate scrollbar for kanban lanes / overflow tables. */
 @utility scrollbar-slim {
   scrollbar-width: thin;
@@ -154,4 +191,19 @@
   &::-webkit-scrollbar-track {
     background: transparent;
   }
+}
+
+/* Edge shadows that appear only when a horizontal scroll area has more content
+   off-screen (and fade out at each end). Tuned for white card surfaces. The
+   `local` cover gradients ride the content; the `scroll` shadows sit at the
+   viewport edges. */
+@utility scroll-shadow-x {
+  background:
+    linear-gradient(to right, #fff 30%, rgba(255, 255, 255, 0)) left center,
+    linear-gradient(to left, #fff 30%, rgba(255, 255, 255, 0)) right center,
+    radial-gradient(farthest-side at 0 50%, rgba(15, 23, 42, 0.12), rgba(15, 23, 42, 0)) left center,
+    radial-gradient(farthest-side at 100% 50%, rgba(15, 23, 42, 0.12), rgba(15, 23, 42, 0)) right center;
+  background-repeat: no-repeat;
+  background-size: 36px 100%, 36px 100%, 14px 100%, 14px 100%;
+  background-attachment: local, local, scroll, scroll;
 }

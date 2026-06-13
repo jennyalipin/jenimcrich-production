@@ -311,6 +311,33 @@ values
    false, now() - interval '2 days')
 on conflict (id) do nothing;
 
+-- candidates.location was added later (migration 0003) and isn't in the insert
+-- column list above; backfill the seed people by name so fresh seeds match the
+-- demo data (Philippines bases, plus the TN-visa Canadian/Mexican applicants).
+update public.candidates set location = case full_name
+    when 'Alex Miller'           then 'Cebu, PH'
+    when 'Angela Cruz'           then 'Rizal, PH'
+    when 'Carlo Mendoza'         then 'Davao, PH'
+    when 'Carlos Hernandez'      then 'Mexico City, MX'
+    when 'Daniel Ocampo'         then 'Manila, PH'
+    when 'Diana Reyes'           then 'Surigao, PH'
+    when 'Etienne Tremblay'      then 'Toronto, ON, Canada'
+    when 'Grace Villanueva'      then 'Cebu, PH'
+    when 'Hannah Dizon'          then 'Manila, PH'
+    when 'James Uy'              then 'Cebu, PH'
+    when 'Kevin Tan'             then 'Rizal, PH'
+    when 'Liza Fernandez'        then 'Rizal, PH'
+    when 'Marcus Thompson'       then 'Rizal, PH'
+    when 'Maria Santos'          then 'Cebu, PH'
+    when 'Miguel Bautista'       then 'Rizal, PH'
+    when 'Nicole Aquino'         then 'Manila, PH'
+    when 'Paolo Ramos'           then 'Cebu, PH'
+    when 'Patricia Gomez'        then 'Manila, PH'
+    when 'Robert Lim'            then 'Davao, PH'
+    when 'Sarah Jenkins'         then 'Davao, PH'
+  end
+where location is null;
+
 -- ----------------------------------------------------------------------------
 -- Candidate skills (skill, years)
 -- ----------------------------------------------------------------------------

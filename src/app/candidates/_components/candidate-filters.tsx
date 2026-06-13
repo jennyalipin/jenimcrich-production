@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
-import { Button, Card, CardBody, Input } from "@/components/ui";
+import { Button, Card, CardBody, Icon, Input } from "@/components/ui";
 import { STAGES, STAGE_LABELS, type Stage } from "@/lib/data/types";
 import type { CandidateFilterState } from "../_lib/view-types";
 
@@ -95,7 +95,7 @@ export function CandidateFilters({
         <fieldset>
           <legend className="micro-label mb-2 text-slate-500">Tags</legend>
           {allTags.length === 0 ? (
-            <p className="text-[12px] text-slate-400">No tags yet</p>
+            <p className="text-[12px] text-slate-500">No tags yet</p>
           ) : (
             <div className="space-y-1.5">
               {allTags.map((tag) => (
@@ -120,7 +120,7 @@ export function CandidateFilters({
             checked={state.flagged}
             onChange={() => navigate({ ...state, flagged: !state.flagged })}
           />
-          <span aria-hidden="true">⭐</span> Flagged only
+          <Icon name="star" size={14} fill className="text-amber-400" /> Flagged only
         </label>
 
         <Button

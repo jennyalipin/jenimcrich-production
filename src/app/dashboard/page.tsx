@@ -5,14 +5,23 @@ import {
   getInterviews,
   getSettings,
   INTERVIEW_TYPE_LABELS,
-  REFERENCE_NOW,
+  displayNow,
   type ActivityFeedItem,
   type ActivityType,
   type InterviewWithRelations,
   type StalledApplication,
 } from "@/lib/data";
 import { formatDayLabel, formatTime, relativeTime } from "@/lib/format";
-import { Card, CardBody, CardHeader, CardTitle, EmptyState, StageBadge } from "@/components/ui";
+import {
+  Card,
+  CardBody,
+  CardHeader,
+  CardTitle,
+  EmptyState,
+  Icon,
+  StageBadge,
+  type IconName,
+} from "@/components/ui";
 import { PipelineSummaryBar } from "@/components/charts/pipeline-summary-bar";
 import { StatCard } from "@/components/charts/stat-card";
 
@@ -22,16 +31,16 @@ export const metadata: Metadata = {
 
 const DAY_MS = 86_400_000;
 
-const ACTIVITY_ICONS: Record<ActivityType, string> = {
-  stage: "🔁",
-  note: "📝",
-  email: "✉️",
-  doc: "📎",
-  interview: "📅",
-  tag: "🏷️",
-  flag: "🚩",
-  scorecard: "📋",
-  system: "⚙️",
+const ACTIVITY_ICONS: Record<ActivityType, IconName> = {
+  stage: "stage",
+  note: "note",
+  email: "email",
+  doc: "doc",
+  interview: "interview",
+  tag: "tag",
+  flag: "flag",
+  scorecard: "scorecard",
+  system: "system",
 };
 
 const thClass =
@@ -41,9 +50,9 @@ const tdClass = "px-4 py-2.5 align-middle first:pl-5 last:pr-5";
 function TodayBanner({ interviews }: { interviews: InterviewWithRelations[] }) {
   if (interviews.length === 0) return null;
   return (
-    <Card className="border-l-4 border-l-accent px-5 py-3.5">
+    <Card className="flex items-start gap-2.5 px-5 py-3.5">
+      <Icon name="calendar" size={16} className="mt-0.5 shrink-0 text-slate-500" />
       <p className="text-[13px] leading-relaxed text-slate-600">
-        <span aria-hidden="true">📅 </span>
         <span className="font-semibold text-ink">Today:</span>{" "}
         {interviews
           .map(
@@ -64,7 +73,7 @@ function UpcomingInterviews({ interviews }: { interviews: InterviewWithRelations
   if (interviews.length === 0) {
     return (
       <EmptyState
-        icon="📅"
+        icon={<Icon name="interview" size={20} />}
         title="No interviews scheduled"
         hint="Book one from a candidate's Schedule tab — it will show up here."
       />
@@ -97,7 +106,7 @@ function StalledTable({ stalled }: { stalled: StalledApplication[] }) {
   if (stalled.length === 0) {
     return (
       <EmptyState
-        icon="✅"
+        icon={<Icon name="success" size={20} />}
         title="All candidates moving on schedule"
         hint="Nobody has sat without a stage move, note, or email beyond the threshold."
       />
@@ -135,10 +144,12 @@ function StalledTable({ stalled }: { stalled: StalledApplication[] }) {
               <td className={`${tdClass} font-semibold text-ink`}>
                 {app.candidate.full_name}
                 {app.candidate.flagged ? (
-                  <span aria-hidden="true" title="Flagged priority">
-                    {" "}
-                    🚩
-                  </span>
+                  <Icon
+                    name="flag"
+                    size={13}
+                    label="Flagged priority"
+                    className="ml-1 inline-block align-[-1px] text-amber-600"
+                  />
                 ) : null}
               </td>
               <td className={`${tdClass} text-slate-600`}>
@@ -173,7 +184,7 @@ function ActivityFeed({ activity }: { activity: ActivityFeedItem[] }) {
   if (activity.length === 0) {
     return (
       <EmptyState
-        icon="🗒️"
+        icon={<Icon name="note" size={20} />}
         title="No activity yet"
         hint="Stage moves, notes, and emails will appear here as the team works."
       />
@@ -185,9 +196,9 @@ function ActivityFeed({ activity }: { activity: ActivityFeedItem[] }) {
         <li key={item.id} className="flex gap-3 px-5 py-3">
           <span
             aria-hidden="true"
-            className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-full bg-slate-100 text-[13px]"
+            className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-full bg-slate-100"
           >
-            {ACTIVITY_ICONS[item.type]}
+            <Icon name={ACTIVITY_ICONS[item.type]} size={14} className="text-slate-500" />
           </span>
           <div className="min-w-0 flex-1">
             <p className="text-[13px] leading-snug text-slate-700">
@@ -200,7 +211,7 @@ function ActivityFeed({ activity }: { activity: ActivityFeedItem[] }) {
               — {item.body}
             </p>
             <p className="mt-0.5 text-xs text-slate-400">
-              {relativeTime(item.created_at, REFERENCE_NOW)} · {item.actor_name}
+              {relativeTime(item.created_at, displayNow())} · {item.actor_name}
             </p>
           </div>
         </li>
@@ -210,7 +221,8 @@ function ActivityFeed({ activity }: { activity: ActivityFeedItem[] }) {
 }
 
 export default async function DashboardPage() {
-  const todayStartMs = REFERENCE_NOW.getTime() - (REFERENCE_NOW.getTime() % DAY_MS);
+  const nowMs = displayNow().getTime();
+  const todayStartMs = nowMs - (nowMs % DAY_MS);
   const [stats, settings, weekInterviews] = await Promise.all([
     getDashboardStats(),
     getSettings(),

@@ -7,6 +7,7 @@ import {
   CardHeader,
   CardTitle,
   EmptyState,
+  Icon,
   ScorePill,
   StageBadge,
   cn,
@@ -31,8 +32,8 @@ import {
   type Scorecard,
 } from "@/lib/data";
 import { formatDate, formatDateTime, formatDayLabel, formatTime } from "@/lib/format";
-import { matchScore, rankJobs, scoreBand } from "@/lib/scoring";
-import type { MatchResult, ScoreBand } from "@/lib/types";
+import { matchScore, rankJobs } from "@/lib/scoring";
+import type { MatchResult } from "@/lib/types";
 import { ActivityTimeline } from "../_components/activity-timeline";
 import { CandidateHeader } from "../_components/candidate-header";
 import { CandidateTabs, TabJumpButton } from "../_components/candidate-tabs";
@@ -85,12 +86,6 @@ const REC_VARIANT: Record<Recommendation, BadgeVariant> = {
   no_hire: "danger",
 };
 
-const BAND_BORDER: Record<ScoreBand, string> = {
-  high: "border-l-primary",
-  mid: "border-l-warning",
-  low: "border-l-danger",
-};
-
 /* ------------------------------------------------------------------ */
 /* Server-rendered fragments                                           */
 /* ------------------------------------------------------------------ */
@@ -98,29 +93,32 @@ const BAND_BORDER: Record<ScoreBand, string> = {
 function Stars({ value }: { value: number }) {
   const filled = Math.max(0, Math.min(5, value));
   return (
-    <span aria-label={`${filled} of 5`} className="whitespace-nowrap text-[14px]">
-      <span aria-hidden="true" className="text-amber-400">
-        {"★".repeat(filled)}
-      </span>
-      <span aria-hidden="true" className="text-slate-200">
-        {"★".repeat(5 - filled)}
-      </span>
+    <span aria-label={`${filled} of 5`} className="inline-flex items-center gap-0.5 whitespace-nowrap">
+      {[1, 2, 3, 4, 5].map((n) => (
+        <Icon
+          key={n}
+          name="star"
+          size={14}
+          fill={n <= filled}
+          className={n <= filled ? "text-amber-400" : "text-slate-200"}
+        />
+      ))}
     </span>
   );
 }
 
 function MatchCard({ jobTitle, match }: { jobTitle: string; match: MatchResult }) {
-  const band = scoreBand(match.score);
   return (
-    <Card className={cn("border-l-4", BAND_BORDER[band])}>
+    <Card>
       <CardBody>
         <div className="flex items-center justify-between gap-3">
           <h3 className="text-[15px] font-semibold text-ink">Match vs {jobTitle}</h3>
           <ScorePill score={match.score} />
         </div>
         {match.edge ? (
-          <p className="mt-2 rounded-control bg-slate-50 px-3 py-1.5 text-[12.5px] font-medium text-slate-600">
-            ⚡ {match.edge}
+          <p className="mt-2 flex items-center gap-1.5 rounded-control bg-slate-50 px-3 py-1.5 text-[12.5px] font-medium text-slate-600">
+            <Icon name="bolt" size={14} className="shrink-0 text-primary" />
+            {match.edge}
           </p>
         ) : null}
         <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -130,14 +128,12 @@ function MatchCard({ jobTitle, match }: { jobTitle: string; match: MatchResult }
               {match.pros.length > 0 ? (
                 match.pros.map((pro) => (
                   <li key={pro} className="flex gap-1.5">
-                    <span aria-hidden="true" className="text-primary">
-                      ✓
-                    </span>
+                    <Icon name="check" size={14} className="mt-0.5 shrink-0 text-primary" />
                     {pro}
                   </li>
                 ))
               ) : (
-                <li className="text-slate-400">None identified</li>
+                <li className="text-slate-500">None identified</li>
               )}
             </ul>
           </div>
@@ -147,14 +143,12 @@ function MatchCard({ jobTitle, match }: { jobTitle: string; match: MatchResult }
               {match.cons.length > 0 ? (
                 match.cons.map((con) => (
                   <li key={con} className="flex gap-1.5">
-                    <span aria-hidden="true" className="text-danger-strong">
-                      ✕
-                    </span>
+                    <Icon name="close" size={14} className="mt-0.5 shrink-0 text-danger-strong" />
                     {con}
                   </li>
                 ))
               ) : (
-                <li className="text-slate-400">None identified</li>
+                <li className="text-slate-500">None identified</li>
               )}
             </ul>
           </div>
@@ -333,23 +327,23 @@ function OverviewTab({
 
           <section className="grid grid-cols-2 gap-x-4 gap-y-3 border-y border-slate-100 py-4 sm:grid-cols-3">
             <div>
-              <p className="micro-label text-slate-400">Expected salary</p>
+              <p className="micro-label text-slate-500">Expected salary</p>
               <p className="text-[13px] font-semibold text-slate-800">{profile.expected_salary || "—"}</p>
             </div>
             <div>
-              <p className="micro-label text-slate-400">Notice period</p>
+              <p className="micro-label text-slate-500">Notice period</p>
               <p className="text-[13px] font-semibold text-slate-800">{profile.notice_period || "—"}</p>
             </div>
             <div>
-              <p className="micro-label text-slate-400">Experience</p>
+              <p className="micro-label text-slate-500">Experience</p>
               <p className="text-[13px] font-semibold text-slate-800">{profile.years_exp} years</p>
             </div>
             <div>
-              <p className="micro-label text-slate-400">Location</p>
+              <p className="micro-label text-slate-500">Location</p>
               <p className="text-[13px] font-semibold text-slate-800">{profile.location || "—"}</p>
             </div>
             <div>
-              <p className="micro-label text-slate-400">Source</p>
+              <p className="micro-label text-slate-500">Source</p>
               <p className="text-[13px] font-semibold text-slate-800">{profile.source}</p>
             </div>
           </section>
@@ -365,7 +359,7 @@ function OverviewTab({
                 ))}
               </div>
             ) : (
-              <p className="text-[12.5px] text-slate-400">No skills recorded</p>
+              <p className="text-[12.5px] text-slate-500">No skills recorded</p>
             )}
           </section>
 
@@ -380,7 +374,7 @@ function OverviewTab({
                 ))}
               </div>
             ) : (
-              <p className="text-[12.5px] text-slate-400">None on file</p>
+              <p className="text-[12.5px] text-slate-500">None on file</p>
             )}
           </section>
 
@@ -400,14 +394,18 @@ function OverviewTab({
           <CardHeader>
             <CardTitle>Applications</CardTitle>
             <span className="flex gap-2">
-              <TabJumpButton tab="schedule">📅 Schedule interview</TabJumpButton>
-              <TabJumpButton tab="notes">📝 Add note</TabJumpButton>
+              <TabJumpButton tab="schedule">
+                <Icon name="interview" size={14} className="text-slate-500" /> Schedule interview
+              </TabJumpButton>
+              <TabJumpButton tab="notes">
+                <Icon name="note" size={14} className="text-slate-500" /> Add note
+              </TabJumpButton>
             </span>
           </CardHeader>
           <CardBody>
             {appMatches.length === 0 ? (
               <EmptyState
-                icon="📋"
+                icon={<Icon name="scorecard" size={20} />}
                 title="No applications yet"
                 hint="Match this candidate to an open role from the list below."
               />
@@ -424,18 +422,21 @@ function OverviewTab({
                           </Badge>
                         ) : null}
                       </p>
-                      <p className="text-[12px] text-slate-400">{app.job.client_name}</p>
+                      <p className="text-[12px] text-slate-500">{app.job.client_name}</p>
                     </div>
                     <span className="flex items-center gap-2">
                       <ScorePill score={match.score} />
                       <StageBadge stage={app.stage} />
                       <span
                         className={cn(
-                          "text-[12px] tabular-nums",
-                          app.is_stalled ? "font-bold text-warning-ink" : "text-slate-400",
+                          "inline-flex items-center gap-1 text-[12px] tabular-nums",
+                          app.is_stalled ? "font-bold text-warning-ink" : "text-slate-500",
                         )}
                       >
-                        {app.days_in_stage}d{app.is_stalled ? " ⚠" : ""}
+                        {app.days_in_stage}d
+                        {app.is_stalled ? (
+                          <Icon name="stalled" size={13} label="Stalled" className="text-warning-ink" />
+                        ) : null}
                       </span>
                     </span>
                   </li>
@@ -451,14 +452,14 @@ function OverviewTab({
           </CardHeader>
           <CardBody>
             {openRoleMatches.length === 0 ? (
-              <p className="text-[13px] text-slate-400">No open roles right now.</p>
+              <p className="text-[13px] text-slate-500">No open roles right now.</p>
             ) : (
               <ul className="divide-y divide-slate-100">
                 {openRoleMatches.map(({ job, match }) => (
                   <li key={job.id} className="flex items-center justify-between gap-3 py-2 first:pt-0 last:pb-0">
                     <span className="min-w-0">
                       <span className="block truncate text-[13px] text-slate-700">{job.title}</span>
-                      <span className="block text-[11.5px] text-slate-400">{job.client}</span>
+                      <span className="block text-[11.5px] text-slate-500">{job.client}</span>
                     </span>
                     <ScorePill score={match.score} />
                   </li>
@@ -488,7 +489,7 @@ function ScorecardsList({
       <Card className="self-start">
         <CardBody>
           <EmptyState
-            icon="📊"
+            icon={<Icon name="scorecard" size={20} />}
             title="No scorecards submitted yet"
             hint="Submit the first interview scorecard with the form on the right."
           />
@@ -505,8 +506,9 @@ function ScorecardsList({
             Weighted interview average across {scorecards.length} scorecard
             {scorecards.length === 1 ? "" : "s"}
           </p>
-          <span className="inline-flex items-center rounded-full bg-primary-soft px-3 py-1 text-[15px] font-extrabold tabular-nums text-primary-ink">
-            {interviewAvg}★
+          <span className="inline-flex items-center gap-1 rounded-full bg-primary-soft px-3 py-1 text-[15px] font-extrabold tabular-nums text-primary-ink">
+            {interviewAvg}
+            <Icon name="star" size={14} fill className="text-primary-ink" />
           </span>
         </div>
       ) : null}
@@ -518,7 +520,7 @@ function ScorecardsList({
             <CardBody>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-[13.5px] font-semibold text-slate-800">{card.interviewer_name}</p>
-                <p className="text-[12px] text-slate-400">{formatDate(card.created_at)}</p>
+                <p className="text-[12px] text-slate-500">{formatDate(card.created_at)}</p>
               </div>
               <div className="mt-3 space-y-1">
                 {SCORECARD_COMPETENCIES.map((cat) => (
@@ -527,7 +529,7 @@ function ScorecardsList({
                     className="flex items-center justify-between gap-3 border-b border-slate-100 pb-1 last:border-b-0"
                   >
                     <span className="text-[12.5px] text-slate-600">
-                      {cat.key} <span className="text-[11px] text-slate-400">(w{cat.weight})</span>
+                      {cat.key} <span className="text-[11px] text-slate-500">(w{cat.weight})</span>
                     </span>
                     <Stars value={card.ratings[cat.key] ?? 0} />
                   </div>

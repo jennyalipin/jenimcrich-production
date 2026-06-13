@@ -2,7 +2,7 @@
 
 import { useId, useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { Button, FieldError, Input, Label, Modal, Select } from "@/components/ui";
+import { Button, FieldError, Icon, Input, Label, Modal, Select } from "@/components/ui";
 import {
   INTERVIEW_TYPES,
   INTERVIEW_TYPE_LABELS,
@@ -120,11 +120,18 @@ export function ScheduleInterviewButton({
   return (
     <div className="flex items-center gap-3">
       {confirmation ? (
-        <span className="max-w-md truncate text-xs font-semibold text-primary-ink" role="status">
-          ✓ Booked: {confirmation}
+        <span
+          className="inline-flex max-w-md items-center gap-1 truncate text-xs font-semibold text-primary-ink"
+          role="status"
+        >
+          <Icon name="check" size={14} className="shrink-0" />
+          <span className="truncate">Booked: {confirmation}</span>
         </span>
       ) : null}
-      <Button onClick={openModal}>+ Schedule interview</Button>
+      <Button onClick={openModal}>
+        <Icon name="plus" size={15} />
+        Schedule interview
+      </Button>
 
       <Modal
         open={open}

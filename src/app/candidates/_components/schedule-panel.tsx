@@ -9,6 +9,7 @@ import {
   CardHeader,
   CardTitle,
   EmptyState,
+  Icon,
   Input,
   Label,
   Select,
@@ -181,7 +182,7 @@ export function SchedulePanel({
               <div>
                 <p className="micro-label mb-2 text-slate-500">
                   Available slots (UTC){" "}
-                  <span className="font-normal normal-case text-slate-400">
+                  <span className="font-normal normal-case text-slate-500">
                     — booked slots are blocked to prevent double-booking
                   </span>
                 </p>
@@ -206,7 +207,7 @@ export function SchedulePanel({
                   })}
                 </div>
               </div>
-              <p className="text-[12px] text-slate-400">
+              <p className="text-[12px] text-slate-500">
                 Booking blocks the interviewer&apos;s calendar and logs a confirmation email to the
                 candidate&apos;s history.
               </p>
@@ -222,7 +223,7 @@ export function SchedulePanel({
         <CardBody>
           {interviews.length === 0 ? (
             <EmptyState
-              icon="📅"
+              icon={<Icon name="interview" size={20} />}
               title="No interviews booked"
               hint="Pick a slot on the left to book the first interview."
             />
@@ -235,7 +236,7 @@ export function SchedulePanel({
                 >
                   <div>
                     <p className="text-[13px] font-semibold text-slate-800">{iv.typeLabel}</p>
-                    <p className="text-[12px] text-slate-400">
+                    <p className="text-[12px] text-slate-500">
                       {iv.when} · {iv.interviewer} · {iv.durationMinutes} min
                     </p>
                   </div>

@@ -8,11 +8,11 @@
 
 import type { Stage } from "@/lib/data/types";
 
-/** Per-stage hues: slate → blue → violet → amber → emerald; red is the exit. */
+/** Per-stage hues: slate → blue → cyan → amber → emerald; red is the exit. */
 export const STAGE_CHART_COLORS: Record<Stage, string> = {
   applied: "#94a3b8",
   screening: "#3b82f6",
-  interview: "#8b5cf6",
+  interview: "#0891b2",
   offer: "#f59e0b",
   hired: "#10b981",
   rejected: "#ef4444",
@@ -23,7 +23,7 @@ export const SOURCE_CHART_COLORS: readonly string[] = [
   "#10b981",
   "#3b82f6",
   "#f59e0b",
-  "#8b5cf6",
+  "#0891b2",
   "#64748b",
 ];
 

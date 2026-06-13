@@ -1,8 +1,12 @@
 "use server";
 
 /**
- * DEMO AUTH server actions — swapped for Supabase Auth once provisioned.
- * Credentials are checked in src/lib/demo-auth.ts and are never logged.
+ * Sign-in server actions.
+ *
+ * When Supabase is configured these drive Supabase Auth (cookies set via the
+ * @supabase/ssr server client); otherwise they fall back to the signed-cookie
+ * demo session in `@/lib/demo-auth`, so the app still runs with zero config.
+ * Credentials are never logged.
  */
 
 import { cookies } from "next/headers";
@@ -15,6 +19,8 @@ import {
   sessionCookieOptions,
   verifyDemoCredentials,
 } from "@/lib/demo-auth";
+import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { isSupabaseConfigured } from "@/lib/supabase/env";
 
 export interface SignInState {
   error: string | null;
@@ -27,7 +33,7 @@ const credentialsSchema = z.object({
   password: z.string().min(1, { error: "Please enter your password." }),
 });
 
-async function establishSession(email: string): Promise<void> {
+async function establishDemoSession(email: string): Promise<void> {
   const store = await cookies();
   store.set(SESSION_COOKIE_NAME, createSessionToken(email), sessionCookieOptions);
 }
@@ -52,6 +58,21 @@ export async function signIn(
     };
   }
 
+  const supabase = await getSupabaseServerClient();
+  if (supabase) {
+    const { error } = await supabase.auth.signInWithPassword({
+      email: parsed.data.email.trim(),
+      password: parsed.data.password,
+    });
+    if (error) {
+      return {
+        error: "That email and password don't match. Please try again.",
+        email: raw.email,
+      };
+    }
+    redirect("/dashboard");
+  }
+
   if (!verifyDemoCredentials(parsed.data.email, parsed.data.password)) {
     return {
       error:
@@ -60,19 +81,38 @@ export async function signIn(
     };
   }
 
-  await establishSession(parsed.data.email.trim().toLowerCase());
+  await establishDemoSession(parsed.data.email.trim().toLowerCase());
   redirect("/dashboard");
 }
 
-/** One-click sign-in as the demo recruiter (prototype's ⚡ Demo Login). */
+/** One-click sign-in as the recruiter/owner (prototype's ⚡ Demo Login). */
 export async function demoSignIn(): Promise<void> {
-  await establishSession(DEMO_USER.email);
+  const supabase = await getSupabaseServerClient();
+  if (supabase) {
+    const password = process.env.STAGING_USER_PASSWORD;
+    if (password) {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: DEMO_USER.email,
+        password,
+      });
+      if (!error) redirect("/dashboard");
+    }
+    // No staging password configured — send the user to sign in explicitly.
+    redirect("/login");
+  }
+
+  await establishDemoSession(DEMO_USER.email);
   redirect("/dashboard");
 }
 
-/** Clears the demo session cookie and returns to the login screen. */
+/** Signs out of either backend and returns to the login screen. */
 export async function signOut(): Promise<void> {
-  const store = await cookies();
-  store.set(SESSION_COOKIE_NAME, "", { ...sessionCookieOptions, maxAge: 0 });
+  if (isSupabaseConfigured()) {
+    const supabase = await getSupabaseServerClient();
+    await supabase?.auth.signOut();
+  } else {
+    const store = await cookies();
+    store.set(SESSION_COOKIE_NAME, "", { ...sessionCookieOptions, maxAge: 0 });
+  }
   redirect("/login");
 }

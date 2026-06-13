@@ -17,6 +17,8 @@ export function DataCard() {
   const toast = useToast();
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
+  // Inlined at build time — true once the app is wired to Supabase.
+  const liveData = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
 
   function handleReset() {
     startTransition(async () => {
@@ -36,15 +38,27 @@ export function DataCard() {
         <CardTitle>Data</CardTitle>
       </CardHeader>
       <CardBody className="space-y-4">
-        <p className="text-[12.5px] leading-relaxed text-slate-500">
-          This workspace runs on the demo data layer: jobs, candidates and
-          templates are seeded in server memory while Supabase is being
-          provisioned. Edits apply instantly for everyone viewing the demo and
-          re-seed when the server restarts.
-        </p>
-        <Button variant="danger" size="sm" onClick={() => setConfirmOpen(true)}>
-          Reset demo data
-        </Button>
+        {liveData ? (
+          <p className="text-[12.5px] leading-relaxed text-slate-500">
+            This workspace is connected to Supabase: jobs, candidates, notes,
+            interviews and email history are stored in the database and persist
+            across sessions and restarts. Access is enforced per user by
+            row-level security. The candidate records shown are fictional
+            sample data.
+          </p>
+        ) : (
+          <>
+            <p className="text-[12.5px] leading-relaxed text-slate-500">
+              This workspace runs on the demo data layer: jobs, candidates and
+              templates are seeded in server memory while Supabase is being
+              provisioned. Edits apply instantly for everyone viewing the demo
+              and re-seed when the server restarts.
+            </p>
+            <Button variant="danger" size="sm" onClick={() => setConfirmOpen(true)}>
+              Reset demo data
+            </Button>
+          </>
+        )}
       </CardBody>
 
       <Modal

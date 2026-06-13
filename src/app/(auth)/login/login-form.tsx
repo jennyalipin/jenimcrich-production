@@ -2,7 +2,7 @@
 
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
-import { Button, Input, Label } from "@/components/ui";
+import { Button, Icon, Input, Label } from "@/components/ui";
 import { demoSignIn, signIn, type SignInState } from "./actions";
 
 const initialState: SignInState = { error: null };
@@ -11,12 +11,12 @@ function DemoLoginButton() {
   const { pending } = useFormStatus();
   return (
     <Button type="submit" variant="secondary" block loading={pending}>
-      <span aria-hidden="true">⚡</span> Demo login (Recruiter)
+      <Icon name="bolt" size={15} /> Demo login (Recruiter)
     </Button>
   );
 }
 
-export function LoginForm() {
+export function LoginForm({ liveAuth = false }: { liveAuth?: boolean }) {
   const [state, formAction, isPending] = useActionState(signIn, initialState);
 
   return (
@@ -72,10 +72,22 @@ export function LoginForm() {
       </form>
 
       <p className="mt-4 rounded-control bg-slate-50 px-3.5 py-2.5 text-center text-[12px] leading-relaxed text-slate-500">
-        Demo credentials:{" "}
-        <span className="font-semibold text-slate-700">jenny@jenimcrich.com</span>
-        {" · "}
-        <span className="font-semibold text-slate-700">demo1234</span>
+        {liveAuth ? (
+          <>
+            Use the{" "}
+            <span className="inline-flex items-center gap-1 font-semibold text-slate-700">
+              <Icon name="bolt" size={13} /> Demo login
+            </span>{" "}
+            button to enter as the recruiter, or sign in with your own account.
+          </>
+        ) : (
+          <>
+            Demo credentials:{" "}
+            <span className="font-semibold text-slate-700">jenny@jenimcrich.com</span>
+            {" · "}
+            <span className="font-semibold text-slate-700">demo1234</span>
+          </>
+        )}
       </p>
     </div>
   );
