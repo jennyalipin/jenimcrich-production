@@ -36,7 +36,7 @@ const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
  *  the Interview stage hue; emerald = final panel; blue = HR; amber = client). */
 const typeChipClass: Record<InterviewType, string> = {
   hr_interview: "bg-info-soft text-info-ink",
-  technical: "bg-accent-soft text-accent-ink",
+  technical: "bg-interview-soft text-interview-ink",
   final_panel: "bg-primary-soft text-primary-ink",
   client_interview: "bg-warning-soft text-warning-ink",
 };

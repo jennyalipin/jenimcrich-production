@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
 /*
  * JeniMcRich Recruitment — design tokens
@@ -21,9 +22,28 @@
   --color-sidebar-line: #334155; /* dividers on dark chrome */
   --color-ink: #0f172a; /* headings */
 
-  /* Legacy starter aliases (kept so existing pages don't break) */
-  --color-background: #f8fafc;
-  --color-foreground: #0f172a;
+  /* ---- shadcn/Radix semantic tokens — bridged to the emerald/slate system
+     so shadcn components render on-brand and obey the UI rules by default.
+     `--color-accent` here is shadcn's NEUTRAL hover/selected surface (not the
+     cyan interview accent, which is renamed to `interview` below). ---- */
+  --color-background: #ffffff;
+  --color-foreground: #1e293b; /* slate-800 — dense data text */
+  --color-card: #ffffff;
+  --color-card-foreground: #1e293b;
+  --color-popover: #ffffff;
+  --color-popover-foreground: #1e293b;
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #f1f5f9; /* slate-100 */
+  --color-secondary-foreground: #0f172a;
+  --color-muted: #f1f5f9;
+  --color-muted-foreground: #64748b; /* slate-500 */
+  --color-accent: #f1f5f9; /* neutral hover/selected (shadcn) */
+  --color-accent-foreground: #0f172a;
+  --color-destructive: #ef4444;
+  --color-destructive-foreground: #ffffff;
+  --color-border: #e2e8f0; /* slate-200 */
+  --color-input: #cbd5e1; /* slate-300 */
+  --color-ring: #059669; /* emerald focus ring */
 
   /* ---- Primary action (emerald) ---- */
   --color-primary: #059669;
@@ -46,10 +66,11 @@
   --color-info-soft: #dbeafe;
   --color-info-ink: #1e40af;
 
-  /* Interview-stage accent — cyan (deliberately not violet/indigo). */
-  --color-accent: #0891b2;
-  --color-accent-soft: #cffafe;
-  --color-accent-ink: #155e75;
+  /* Interview-stage accent — cyan (deliberately not violet/indigo). Renamed
+     from `accent` so it doesn't collide with shadcn's neutral `--color-accent`. */
+  --color-interview: #0891b2;
+  --color-interview-soft: #cffafe;
+  --color-interview-ink: #155e75;
 
   /* ---- Radii — tight 6px controls, surfaces step up (Ashby-style) ---- */
   --radius-control: 0.375rem; /* 6px */
@@ -107,6 +128,13 @@
 }
 
 @layer base {
+  :root {
+    /* Plain var for shadcn components that reference var(--radius) directly.
+       Deliberately NOT a @theme token, so Tailwind's rounded-md/lg scale (and
+       our existing usages) stay on the v4 defaults. */
+    --radius: 0.5rem;
+  }
+
   body {
     background-color: var(--color-canvas);
     color: #1e293b; /* slate-800 — dense data reads better than near-black */

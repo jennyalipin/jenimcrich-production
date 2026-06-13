@@ -20,7 +20,7 @@ export type StageInput = PipelineStage | Lowercase<PipelineStage>;
 const stageClass: Record<PipelineStage, string> = {
   Applied: "bg-slate-200 text-slate-700",
   Screening: "bg-info-soft text-info-ink",
-  Interview: "bg-accent-soft text-accent-ink",
+  Interview: "bg-interview-soft text-interview-ink",
   Offer: "bg-warning-soft text-warning-ink",
   Hired: "bg-primary-soft text-primary-ink",
   Rejected: "bg-danger-soft text-danger-ink",
