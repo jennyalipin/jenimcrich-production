@@ -385,7 +385,7 @@ function CardFace({ card, overlay = false }: { card: BoardCard; overlay?: boolea
   return (
     <article
       className={cn(
-        "cursor-grab rounded-[10px] border border-slate-200 bg-surface px-3 py-2.5 shadow-card active:cursor-grabbing",
+        "cursor-grab rounded-[10px] border border-slate-200 bg-surface px-3 py-2.5 shadow-card transition-[box-shadow,transform] duration-150 hover:-translate-y-0.5 hover:shadow-raised active:cursor-grabbing",
         card.isStalled && "ring-1 ring-warning-soft",
         overlay && "shadow-raised",
       )}

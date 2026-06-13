@@ -13,6 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { signOut } from "@/app/(auth)/login/actions";
 import { CommandPalette } from "./CommandPalette";
 import { MobileNav } from "./MobileNav";
@@ -141,27 +142,32 @@ function NotificationsBell() {
 
   return (
     <div ref={ref} className="relative">
-      <button
-        type="button"
-        aria-label={unread > 0 ? `Notifications, ${unread} unread` : "Notifications"}
-        aria-haspopup="true"
-        aria-expanded={open}
-        onClick={() => {
-          setOpen(!open);
-          setSeen(true);
-        }}
-        className="relative grid h-9 w-9 place-items-center rounded-lg border border-white/10 text-slate-300 outline-none transition-colors hover:bg-white/10 hover:text-white focus-visible:ring-2 focus-visible:ring-emerald-400"
-      >
-        <TopSvg>
-          <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
-          <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
-        </TopSvg>
-        {unread > 0 && (
-          <span className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white">
-            {unread}
-          </span>
-        )}
-      </button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            aria-label={unread > 0 ? `Notifications, ${unread} unread` : "Notifications"}
+            aria-haspopup="true"
+            aria-expanded={open}
+            onClick={() => {
+              setOpen(!open);
+              setSeen(true);
+            }}
+            className="relative grid h-9 w-9 place-items-center rounded-lg border border-white/10 text-slate-300 outline-none transition-colors hover:bg-white/10 hover:text-white focus-visible:ring-2 focus-visible:ring-emerald-400"
+          >
+            <TopSvg>
+              <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+              <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+            </TopSvg>
+            {unread > 0 && (
+              <span className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white">
+                {unread}
+              </span>
+            )}
+          </button>
+        </TooltipTrigger>
+        <TooltipContent>Notifications</TooltipContent>
+      </Tooltip>
 
       {open && (
         <div className={`${POPOVER_CLASSES} w-80`}>
