@@ -255,6 +255,7 @@ export default async function CandidateDetailPage({ params }: PageProps) {
         }
         documents={
           <DocumentsPanel
+            candidateId={profile.id}
             documents={profile.documents.map((doc) => ({
               id: doc.id,
               fileName: doc.file_name,
