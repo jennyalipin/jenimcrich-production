@@ -806,6 +806,76 @@ export type Database = {
         }
         Relationships: []
       }
+      tn_compliance: {
+        Row: {
+          application_id: string
+          archived_at: string | null
+          created_at: string
+          eligibility_confidence: string | null
+          employment_ended_at: string | null
+          hired_at: string | null
+          id: string
+          job_title_at_check: string | null
+          legal_review_cleared_at: string | null
+          legal_review_cleared_by: string | null
+          legal_review_notes: string | null
+          legal_review_required: boolean
+          matched_occupation: string | null
+          retention_until: string | null
+          tn_eligible: boolean | null
+          updated_at: string
+        }
+        Insert: {
+          application_id: string
+          archived_at?: string | null
+          created_at?: string
+          eligibility_confidence?: string | null
+          employment_ended_at?: string | null
+          hired_at?: string | null
+          id?: string
+          job_title_at_check?: string | null
+          legal_review_cleared_at?: string | null
+          legal_review_cleared_by?: string | null
+          legal_review_notes?: string | null
+          legal_review_required?: boolean
+          matched_occupation?: string | null
+          tn_eligible?: boolean | null
+          updated_at?: string
+        }
+        Update: {
+          application_id?: string
+          archived_at?: string | null
+          created_at?: string
+          eligibility_confidence?: string | null
+          employment_ended_at?: string | null
+          hired_at?: string | null
+          id?: string
+          job_title_at_check?: string | null
+          legal_review_cleared_at?: string | null
+          legal_review_cleared_by?: string | null
+          legal_review_notes?: string | null
+          legal_review_required?: boolean
+          matched_occupation?: string | null
+          tn_eligible?: boolean | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tn_compliance_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: true
+            referencedRelation: "applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tn_compliance_legal_review_cleared_by_fkey"
+            columns: ["legal_review_cleared_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -832,6 +902,8 @@ export type Database = {
         | "tag"
         | "flag"
         | "scorecard"
+        | "compliance"
+        | "legal_review"
         | "system"
       candidate_source:
         | "linkedin"
@@ -845,6 +917,11 @@ export type Database = {
         | "portfolio"
         | "certification"
         | "offer_letter"
+        | "tn_support_letter"
+        | "credential_evaluation"
+        | "i94_record"
+        | "passport_copy"
+        | "tn_approval"
         | "other"
       email_status: "queued" | "sent" | "delivered" | "opened" | "bounced"
       email_template_category:
@@ -1024,6 +1101,8 @@ export const Constants = {
         "tag",
         "flag",
         "scorecard",
+        "compliance",
+        "legal_review",
         "system",
       ],
       candidate_source: [
@@ -1039,6 +1118,11 @@ export const Constants = {
         "portfolio",
         "certification",
         "offer_letter",
+        "tn_support_letter",
+        "credential_evaluation",
+        "i94_record",
+        "passport_copy",
+        "tn_approval",
         "other",
       ],
       email_status: ["queued", "sent", "delivered", "opened", "bounced"],

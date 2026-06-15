@@ -34,6 +34,7 @@ import type {
   Stage,
   StalledDays,
   TemplateCategory,
+  TnComplianceRecord,
 } from "./types";
 
 type DbSource = "linkedin" | "referral" | "job_portal" | "indeed" | "agency" | "other";
@@ -73,6 +74,23 @@ export async function currentProfileId(supabase: SupabaseServerClient): Promise<
     .eq("user_id", user.id)
     .maybeSingle();
   return data?.id ?? null;
+}
+
+/**
+ * The signed-in user's role (admin | recruiter | hiring_manager), or null.
+ * A defence-in-depth check for server actions; RLS is still the real gate.
+ */
+export async function currentProfileRole(supabase: SupabaseServerClient): Promise<string | null> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+  const { data } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("user_id", user.id)
+    .maybeSingle();
+  return (data?.role as string | undefined) ?? null;
 }
 
 async function writeActivity(
@@ -756,4 +774,149 @@ export async function sbPurgeSampleData(
   }
 
   return { candidates: candidates ?? 0, jobs: jobs ?? 0 };
+}
+
+/* ------------------------------------------------------------------ */
+/* TN / USMCA compliance writes (migration 0013)                       */
+/* ------------------------------------------------------------------ */
+
+/** Columns the `tn_compliance` table returns (DB-generated cols read-only). */
+const TN_COLUMNS =
+  "id, application_id, job_title_at_check, tn_eligible, matched_occupation, " +
+  "eligibility_confidence, legal_review_required, legal_review_cleared_at, " +
+  "legal_review_cleared_by, legal_review_notes, hired_at, employment_ended_at, " +
+  "retention_until, created_at, updated_at, archived_at";
+
+/** The signed-in user's candidate_id for an application (for the audit row). */
+async function candidateIdForApplication(
+  supabase: SupabaseServerClient,
+  applicationId: string,
+): Promise<string> {
+  const { data, error } = await supabase
+    .from("applications")
+    .select("candidate_id")
+    .eq("id", applicationId)
+    .maybeSingle();
+  fail("load the application", error);
+  if (!data) throw new DataLayerError("NOT_FOUND", "That application could not be found.");
+  return data.candidate_id;
+}
+
+/**
+ * Upsert the TN eligibility screen result for one application (unique by
+ * `application_id`) and log a `compliance` activity row. The result is NOT
+ * legal advice — `legal_review_required` carries the attorney-review interlock
+ * straight through from lib/tn-eligibility.
+ */
+export async function sbUpsertTnCompliance(
+  supabase: SupabaseServerClient,
+  input: {
+    application_id: string;
+    job_title_at_check: string;
+    tn_eligible: boolean;
+    matched_occupation: string | null;
+    eligibility_confidence: "exact" | "keyword" | "none";
+    legal_review_required: boolean;
+  },
+): Promise<TnComplianceRecord> {
+  const actorId = await currentProfileId(supabase);
+  const candidateId = await candidateIdForApplication(supabase, input.application_id);
+
+  const { data, error } = await supabase
+    .from("tn_compliance")
+    .upsert(
+      {
+        application_id: input.application_id,
+        job_title_at_check: input.job_title_at_check,
+        tn_eligible: input.tn_eligible,
+        matched_occupation: input.matched_occupation,
+        eligibility_confidence: input.eligibility_confidence,
+        legal_review_required: input.legal_review_required,
+      },
+      { onConflict: "application_id" },
+    )
+    .select(TN_COLUMNS)
+    .single();
+  fail("save the TN eligibility screen", error);
+
+  await writeActivity(
+    supabase,
+    actorId,
+    candidateId,
+    "compliance",
+    `TN eligibility screened: ${input.tn_eligible ? "may qualify" : "does not qualify"}` +
+      `${input.matched_occupation ? ` (${input.matched_occupation})` : ""} — pending legal review`,
+  );
+  return data as unknown as TnComplianceRecord;
+}
+
+/**
+ * Clear the legal-review interlock on a TN-compliance record (admin-only — the
+ * caller re-checks the role, and RLS still applies). Records the attorney
+ * sign-off in a `legal_review` activity row.
+ */
+export async function sbClearLegalReview(
+  supabase: SupabaseServerClient,
+  applicationId: string,
+  notes: string,
+): Promise<TnComplianceRecord> {
+  const actorId = await currentProfileId(supabase);
+  const candidateId = await candidateIdForApplication(supabase, applicationId);
+
+  const { data, error } = await supabase
+    .from("tn_compliance")
+    .update({
+      legal_review_required: false,
+      legal_review_cleared_at: new Date().toISOString(),
+      legal_review_cleared_by: actorId,
+      legal_review_notes: notes.trim() || null,
+    })
+    .eq("application_id", applicationId)
+    .select(TN_COLUMNS)
+    .single();
+  fail("clear the legal review", error);
+  if (!data) {
+    throw new DataLayerError(
+      "NOT_FOUND",
+      "There is no TN screen to clear yet — run the eligibility check first.",
+    );
+  }
+
+  await writeActivity(
+    supabase,
+    actorId,
+    candidateId,
+    "legal_review",
+    `Legal review cleared by immigration attorney${notes.trim() ? ` — ${notes.trim()}` : ""}`,
+  );
+  return data as unknown as TnComplianceRecord;
+}
+
+/** Read the TN-compliance record for an application, or null. */
+export async function sbGetTnCompliance(
+  supabase: SupabaseServerClient,
+  applicationId: string,
+): Promise<TnComplianceRecord | null> {
+  const { data, error } = await supabase
+    .from("tn_compliance")
+    .select(TN_COLUMNS)
+    .eq("application_id", applicationId)
+    .is("archived_at", null)
+    .maybeSingle();
+  fail("load the TN compliance record", error);
+  return (data as unknown as TnComplianceRecord | null) ?? null;
+}
+
+/** Document categories present (non-archived) for a candidate — for the checklist. */
+export async function sbGetCandidateDocCategories(
+  supabase: SupabaseServerClient,
+  candidateId: string,
+): Promise<string[]> {
+  const { data, error } = await supabase
+    .from("documents")
+    .select("category")
+    .eq("candidate_id", candidateId)
+    .is("archived_at", null);
+  fail("load the candidate's documents", error);
+  return (data ?? []).map((d) => d.category as string);
 }

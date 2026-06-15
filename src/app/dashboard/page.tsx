@@ -40,6 +40,8 @@ const ACTIVITY_ICONS: Record<ActivityType, IconName> = {
   tag: "tag",
   flag: "flag",
   scorecard: "scorecard",
+  compliance: "visa",
+  legal_review: "verified",
   system: "system",
 };
 

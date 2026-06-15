@@ -32,12 +32,17 @@ import {
   sbAddNote,
   sbAddScorecard,
   sbCancelInterview,
+  sbClearLegalReview,
+  sbGetCandidateDocCategories,
+  sbGetTnCompliance,
   sbIsSlotTaken,
   sbLogEmail,
   sbMoveStage,
   sbScheduleInterview,
   sbUpdateSettings,
+  sbUpsertTnCompliance,
 } from "./supabase-mutations";
+import { isTnEligible, TN_REQUIRED_DOCS } from "@/lib/tn-eligibility";
 import {
   ACTIVE_STAGES,
   DataLayerError,
@@ -84,6 +89,9 @@ import {
   type Stage,
   type StageTime,
   type StalledApplication,
+  type TnChecklistStatus,
+  type TnComplianceRecord,
+  type TnRequiredDoc,
   type VisaType,
 } from "./types";
 import { matchScore } from "@/lib/scoring";
@@ -1516,6 +1524,243 @@ export async function updateSettings(patch: Partial<Settings>): Promise<Settings
   if (patch.stalled_days !== undefined) s.settings.stalled_days = patch.stalled_days;
   if (patch.stalled_enabled !== undefined) s.settings.stalled_enabled = patch.stalled_enabled;
   return clone(s.settings);
+}
+
+/* ------------------------------------------------------------------ */
+/* TN / USMCA compliance (migration 0013)                              */
+/* ------------------------------------------------------------------ */
+
+const TN_VISAS: readonly VisaType[] = ["TN_CANADIAN_ONLY", "TN_CANADIAN_OR_MEXICAN"];
+
+/** Build the required-document checklist given the categories on file. */
+function buildTnDocs(presentCategories: readonly string[]): TnRequiredDoc[] {
+  const present = new Set(presentCategories);
+  return TN_REQUIRED_DOCS.map((d) => ({
+    category: d.category as TnRequiredDoc["category"],
+    label: d.label,
+    hint: d.hint,
+    present: present.has(d.category),
+  }));
+}
+
+/**
+ * Compose a {@link TnChecklistStatus} from a job title, visa, the persisted
+ * record (if any), and the candidate's document categories. The eligibility
+ * read prefers the persisted screen; if none exists it computes a live screen
+ * from the job title so the panel always has something to show. ALL results
+ * remain attorney-gated (lib/tn-eligibility's interlock).
+ */
+function composeTnChecklist(args: {
+  applicationId: string;
+  jobTitle: string;
+  visa: VisaType;
+  record: TnComplianceRecord | null;
+  docCategories: readonly string[];
+}): TnChecklistStatus {
+  const { applicationId, jobTitle, visa, record, docCategories } = args;
+  const docs = buildTnDocs(docCategories);
+  const allDocsPresent = docs.every((d) => d.present);
+
+  if (record && record.tn_eligible !== null) {
+    return {
+      applicationId,
+      jobTitle,
+      visa,
+      eligible: record.tn_eligible,
+      matchedOccupation: record.matched_occupation,
+      confidence: record.eligibility_confidence,
+      legalReviewRequired: record.legal_review_required,
+      legalReviewClearedAt: record.legal_review_cleared_at,
+      legalReviewNotes: record.legal_review_notes,
+      docs,
+      allDocsPresent,
+      record,
+    };
+  }
+
+  // No persisted screen yet — compute a live (unsaved) one from the title.
+  const live = isTnEligible(jobTitle);
+  return {
+    applicationId,
+    jobTitle,
+    visa,
+    eligible: live.eligible,
+    matchedOccupation: live.matchedOccupation,
+    confidence: live.confidence,
+    legalReviewRequired: live.legalReviewRequired,
+    legalReviewClearedAt: record?.legal_review_cleared_at ?? null,
+    legalReviewNotes: record?.legal_review_notes ?? null,
+    docs,
+    allDocsPresent,
+    record,
+  };
+}
+
+/**
+ * The TN checklist view-model for an application: eligibility screen + document
+ * checklist + legal-review interlock. The Supabase path is wrapped so it never
+ * throws if migration 0013 isn't applied yet — it degrades to the live
+ * (computed, unsaved) screen with whatever documents are visible. The demo
+ * store has no persisted record, so it returns a computed stub (all docs
+ * missing) derived from the application's job title.
+ */
+export async function getTnChecklist(applicationId: string): Promise<TnChecklistStatus | null> {
+  const supabase = await getSupabaseServerClient();
+  if (supabase) {
+    try {
+      const s = await freshStore(supabase);
+      const app = s.applications.find((a) => a.id === applicationId);
+      if (!app) return null;
+      const job = s.jobs.find((j) => j.id === app.job_id);
+      if (!job) return null;
+
+      // These two reads touch tn_compliance / documents; if 0013 isn't applied
+      // the tn_compliance read throws and we fall through to the demo path.
+      const [record, docCategories] = await Promise.all([
+        sbGetTnCompliance(supabase, applicationId),
+        sbGetCandidateDocCategories(supabase, app.candidate_id),
+      ]);
+      return composeTnChecklist({
+        applicationId,
+        jobTitle: job.title,
+        visa: job.visa,
+        record,
+        docCategories,
+      });
+    } catch {
+      // 0013 not applied (or a transient read failure): degrade to a safe,
+      // computed stub from the in-memory store rather than throwing.
+    }
+  }
+
+  const s = await getStore();
+  const app = s.applications.find((a) => a.id === applicationId);
+  if (!app) return null;
+  const job = s.jobs.find((j) => j.id === app.job_id);
+  if (!job) return null;
+  const docCategories = s.documents
+    .filter((d) => d.candidate_id === app.candidate_id)
+    .map((d) => d.category as string);
+  return composeTnChecklist({
+    applicationId,
+    jobTitle: job.title,
+    visa: job.visa,
+    record: null,
+    docCategories,
+  });
+}
+
+/** The persisted TN-compliance record for an application, or null. */
+export async function getTnComplianceRecord(
+  applicationId: string,
+): Promise<TnComplianceRecord | null> {
+  const supabase = await getSupabaseServerClient();
+  if (supabase) {
+    try {
+      return await sbGetTnCompliance(supabase, applicationId);
+    } catch {
+      // 0013 not applied yet — there is no record.
+    }
+  }
+  return null;
+}
+
+/**
+ * Run (and persist) the TN eligibility screen for an application from its
+ * current job title. On the demo store there is no persistence layer, so it
+ * returns the freshly-computed, unsaved checklist. NOT legal advice — every
+ * result stays attorney-gated.
+ */
+export async function runTnEligibilityCheck(applicationId: string): Promise<TnChecklistStatus> {
+  const supabase = await getSupabaseServerClient();
+  if (supabase) {
+    const pre = await freshStore(supabase);
+    const app = pre.applications.find((a) => a.id === applicationId);
+    if (!app) throw new DataLayerError("NOT_FOUND", "That application could not be found.");
+    const job = pre.jobs.find((j) => j.id === app.job_id);
+    if (!job) throw new DataLayerError("NOT_FOUND", "That job could not be found.");
+
+    const screen = isTnEligible(job.title);
+    const record = await sbUpsertTnCompliance(supabase, {
+      application_id: applicationId,
+      job_title_at_check: job.title,
+      tn_eligible: screen.eligible,
+      matched_occupation: screen.matchedOccupation,
+      eligibility_confidence: screen.confidence,
+      legal_review_required: screen.legalReviewRequired,
+    });
+    const docCategories = await sbGetCandidateDocCategories(supabase, app.candidate_id);
+    return composeTnChecklist({
+      applicationId,
+      jobTitle: job.title,
+      visa: job.visa,
+      record,
+      docCategories,
+    });
+  }
+
+  // Demo store: compute on the fly (no persistence), log a compliance activity.
+  const s = db();
+  const app = applicationOrThrow(s, applicationId);
+  const job = jobOrThrow(s, app.job_id);
+  const screen = isTnEligible(job.title);
+  appendActivity(
+    s,
+    app.candidate_id,
+    "compliance",
+    `TN eligibility screened: ${screen.eligible ? "may qualify" : "does not qualify"}` +
+      `${screen.matchedOccupation ? ` (${screen.matchedOccupation})` : ""} — pending legal review`,
+    "Jenny M.",
+  );
+  const checklist = await getTnChecklist(applicationId);
+  if (!checklist) throw new DataLayerError("NOT_FOUND", "That application could not be found.");
+  return checklist;
+}
+
+/**
+ * Clear the legal-review interlock on an application's TN screen. Admin-only —
+ * the server action re-checks the role; the Supabase RLS update policy is the
+ * real gate. On the demo store (no persistence) this logs the sign-off only.
+ */
+export async function clearTnLegalReview(
+  applicationId: string,
+  notes: string,
+): Promise<TnChecklistStatus> {
+  const supabase = await getSupabaseServerClient();
+  if (supabase) {
+    const record = await sbClearLegalReview(supabase, applicationId, notes);
+    const pre = await freshStore(supabase);
+    const app = pre.applications.find((a) => a.id === applicationId);
+    const job = app ? pre.jobs.find((j) => j.id === app.job_id) : undefined;
+    const docCategories = app
+      ? await sbGetCandidateDocCategories(supabase, app.candidate_id)
+      : [];
+    return composeTnChecklist({
+      applicationId,
+      jobTitle: job?.title ?? record.job_title_at_check ?? "",
+      visa: (job?.visa ?? "UNSPECIFIED") as VisaType,
+      record,
+      docCategories,
+    });
+  }
+
+  const s = db();
+  const app = applicationOrThrow(s, applicationId);
+  appendActivity(
+    s,
+    app.candidate_id,
+    "legal_review",
+    `Legal review cleared by immigration attorney${notes.trim() ? ` — ${notes.trim()}` : ""}`,
+    "Jenny M.",
+  );
+  const checklist = await getTnChecklist(applicationId);
+  if (!checklist) throw new DataLayerError("NOT_FOUND", "That application could not be found.");
+  return checklist;
+}
+
+/** True when an application's job carries a TN visa requirement. */
+export function isTnVisa(visa: VisaType): boolean {
+  return TN_VISAS.includes(visa);
 }
 
 /* ------------------------------------------------------------------ */

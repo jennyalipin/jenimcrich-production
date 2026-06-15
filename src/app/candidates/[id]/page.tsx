@@ -24,18 +24,23 @@ import {
   getInterviewers,
   getInterviews,
   getJobs,
+  getTnChecklist,
   isRestrictiveVisa,
+  isTnVisa,
   toScoreCandidate,
   toScoreJob,
   type CandidateProfile,
   type Recommendation,
   type Scorecard,
+  type TnChecklistStatus,
 } from "@/lib/data";
 import { formatDate, formatDateTime, formatDayLabel, formatTime } from "@/lib/format";
 import { matchScore, rankJobs } from "@/lib/scoring";
 import type { MatchResult, ScoreCandidateInput, ScoreJobInput } from "@/lib/types";
 import { ExplainScore } from "@/components/scoring/score-explanation";
 import { ScoringDisclosure } from "@/components/scoring/scoring-disclosure";
+import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { currentProfileRole } from "@/lib/data/supabase-mutations";
 import { ActivityTimeline } from "../_components/activity-timeline";
 import { CandidateHeader } from "../_components/candidate-header";
 import { CandidateTabs, TabJumpButton } from "../_components/candidate-tabs";
@@ -43,6 +48,7 @@ import { DocumentsPanel } from "../_components/documents-panel";
 import { NotesPanel } from "../_components/notes-panel";
 import { ScorecardForm } from "../_components/scorecard-form";
 import { SchedulePanel } from "../_components/schedule-panel";
+import { TnChecklistPanel } from "../_components/tn-checklist-panel";
 import type { CandidateHeaderData } from "../_lib/view-types";
 
 // The demo store mutates between requests — always render fresh.
@@ -235,6 +241,16 @@ export default async function CandidateDetailPage({ params }: PageProps) {
   const interviewerOptions = interviewers.map((person) => ({ id: person.id, name: person.name }));
   const scheduledCount = profile.interviews.filter((iv) => iv.status === "scheduled").length;
 
+  // TN/USMCA compliance: a checklist per application whose job carries a TN
+  // visa requirement (domain rule 4). Admin gate decides who may record the
+  // attorney sign-off; the RLS update policy is the real enforcement.
+  const tnApplications = profile.applications.filter((app) => isTnVisa(app.job.visa));
+  const tnChecklists = (
+    await Promise.all(tnApplications.map((app) => getTnChecklist(app.id)))
+  ).filter((c): c is TnChecklistStatus => c !== null);
+  const supabaseClient = await getSupabaseServerClient();
+  const isAdmin = supabaseClient ? (await currentProfileRole(supabaseClient)) === "admin" : true;
+
   return (
     <div className="space-y-4 p-6">
       <CandidateHeader data={headerData} />
@@ -267,17 +283,27 @@ export default async function CandidateDetailPage({ params }: PageProps) {
           </div>
         }
         documents={
-          <DocumentsPanel
-            candidateId={profile.id}
-            documents={profile.documents.map((doc) => ({
-              id: doc.id,
-              fileName: doc.file_name,
-              category: doc.category,
-              categoryLabel: DOCUMENT_CATEGORY_LABELS[doc.category],
-              uploadedBy: doc.uploaded_by,
-              when: formatDate(doc.created_at),
-            }))}
-          />
+          <div className="space-y-4">
+            <DocumentsPanel
+              candidateId={profile.id}
+              documents={profile.documents.map((doc) => ({
+                id: doc.id,
+                fileName: doc.file_name,
+                category: doc.category,
+                categoryLabel: DOCUMENT_CATEGORY_LABELS[doc.category],
+                uploadedBy: doc.uploaded_by,
+                when: formatDate(doc.created_at),
+              }))}
+            />
+            {tnChecklists.map((status) => (
+              <TnChecklistPanel
+                key={status.applicationId}
+                status={status}
+                candidateId={profile.id}
+                isAdmin={isAdmin}
+              />
+            ))}
+          </div>
         }
         schedule={
           <SchedulePanel

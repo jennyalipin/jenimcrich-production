@@ -163,7 +163,27 @@ describe("parseJD — fallbacks and heuristics", () => {
       visa: "UNSPECIFIED",
       visaNotes: "",
       description: "",
+      // No TN screen on a non-TN (here UNSPECIFIED) visa.
+      tnEligibility: null,
     });
+  });
+
+  it("runs a TN eligibility screen only when the detected visa is a TN type", () => {
+    const tn = parseJD(
+      "Job Title: Mining Engineer\nTN visa for Canadians only.\nLead pit design.",
+    );
+    expect(tn.visa).toBe("TN_CANADIAN_ONLY");
+    expect(tn.tnEligibility).not.toBeNull();
+    expect(tn.tnEligibility?.eligible).toBe(true);
+    expect(tn.tnEligibility?.matchedOccupation).toBe("Engineer (Mining)");
+    // Interlock: never auto-cleared while attorney sign-off is pending.
+    expect(tn.tnEligibility?.legalReviewRequired).toBe(true);
+
+    const nonTn = parseJD(
+      "Job Title: Mining Engineer\nUS citizens or Green Card holders only.",
+    );
+    expect(nonTn.visa).toBe("US_CITIZEN_GC_ONLY");
+    expect(nonTn.tnEligibility).toBeNull();
   });
 });
 
