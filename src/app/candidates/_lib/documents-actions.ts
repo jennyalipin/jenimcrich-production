@@ -21,6 +21,8 @@ const MAX_BYTES = 10 * 1024 * 1024;
 export interface UploadResult {
   ok: boolean;
   error?: string;
+  /** Id of the newly-created `documents` row (only present on success). */
+  documentId?: string;
 }
 
 function isCategory(value: string): value is DocumentCategory {
@@ -62,21 +64,25 @@ export async function uploadDocument(formData: FormData): Promise<UploadResult> 
   });
   if (upErr) return { ok: false, error: "Upload failed. Please try again." };
 
-  const { error: dbErr } = await supabase.from("documents").insert({
-    candidate_id: candidateId,
-    storage_path: path,
-    file_name: file.name.slice(0, 200),
-    category,
-    uploaded_by: profileId,
-  });
-  if (dbErr) {
+  const { data: inserted, error: dbErr } = await supabase
+    .from("documents")
+    .insert({
+      candidate_id: candidateId,
+      storage_path: path,
+      file_name: file.name.slice(0, 200),
+      category,
+      uploaded_by: profileId,
+    })
+    .select("id")
+    .single();
+  if (dbErr || !inserted) {
     // Don't leave an orphaned object if the row insert is rejected.
     await admin.storage.from(BUCKET).remove([path]);
     return { ok: false, error: "Could not save the document. Please try again." };
   }
 
   revalidatePath(`/candidates/${candidateId}`);
-  return { ok: true };
+  return { ok: true, documentId: inserted.id };
 }
 
 export async function getDocumentSignedUrl(

@@ -6,4 +6,4 @@
  */
 
 export { isAIEnabled, getVertexModel } from "./vertex";
-export { parseResumeWithAI } from "./resume";
+export { parseResumeWithAI, parseResumeFromFile } from "./resume";

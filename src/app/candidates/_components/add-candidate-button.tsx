@@ -16,7 +16,11 @@ import {
 } from "@/components/ui";
 import { SOURCES } from "@/lib/data/types";
 import { createCandidate } from "../actions";
+import { analyzeResumeAction } from "@/app/matchmaker/ai-actions";
 import type { JobOption } from "../_lib/view-types";
+
+/** NEXT_PUBLIC_* is inlined at build time, so this is safe in a client component. */
+const AI_ON = process.env.NEXT_PUBLIC_AI_ENABLED === "true";
 
 interface FormValues {
   full_name: string;
@@ -124,7 +128,14 @@ function Field({
 }
 
 /** "+ Add candidate" — a 3-step intake wizard backed by the zod server action. */
-export function AddCandidateButton({ jobs }: { jobs: JobOption[] }) {
+export function AddCandidateButton({
+  jobs,
+  skillDictionary = [],
+}: {
+  jobs: JobOption[];
+  /** Live skill vocabulary for AI auto-fill (flag-gated; empty when AI is off). */
+  skillDictionary?: string[];
+}) {
   const router = useRouter();
   const toast = useToast();
   const [open, setOpen] = useState(false);
@@ -132,6 +143,33 @@ export function AddCandidateButton({ jobs }: { jobs: JobOption[] }) {
   const [values, setValues] = useState<FormValues>(() => emptyForm(jobs));
   const [errors, setErrors] = useState<Partial<Record<FieldKey, string>>>({});
   const [pending, startTransition] = useTransition();
+
+  // AI "auto-fill from resume" state (last step only, flag-gated).
+  const [resumeText, setResumeText] = useState("");
+  const [aiFilled, setAiFilled] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [aiPending, startAiTransition] = useTransition();
+
+  function autofillFromResume() {
+    const text = resumeText.trim();
+    if (text.length < 40) {
+      setAiError("Paste at least a few lines of resume text so there is something to analyze.");
+      return;
+    }
+    setAiError(null);
+    startAiTransition(async () => {
+      const parsed = await analyzeResumeAction({ text, skillDictionary });
+      setValues((prev) => ({
+        ...prev,
+        // Only fill the name when the user hasn't typed one.
+        full_name: prev.full_name.trim() || (parsed.name === "Pasted candidate" ? "" : parsed.name),
+        years_exp: parsed.yearsExp > 0 ? String(parsed.yearsExp) : prev.years_exp,
+        skills_raw: parsed.skills.map((s) => `${s.skill}:${s.years}`).join(", ") || prev.skills_raw,
+        summary: parsed.summary || prev.summary,
+      }));
+      setAiFilled(true);
+    });
+  }
 
   const current = STEPS[step];
   const isLast = step === STEPS.length - 1;
@@ -145,6 +183,9 @@ export function AddCandidateButton({ jobs }: { jobs: JobOption[] }) {
     setValues(emptyForm(jobs));
     setErrors({});
     setStep(0);
+    setResumeText("");
+    setAiFilled(false);
+    setAiError(null);
     setOpen(true);
   }
 
@@ -324,6 +365,42 @@ export function AddCandidateButton({ jobs }: { jobs: JobOption[] }) {
         </ol>
 
         <p className="mb-3 text-[13px] text-slate-500">{current.hint}</p>
+
+        {AI_ON && current.id === "profile" ? (
+          <div className="mb-4 rounded-card border border-slate-200 bg-slate-50 p-3">
+            <Label htmlFor="nc-ai-resume" className="text-[12.5px] text-slate-600">
+              Auto-fill from resume
+            </Label>
+            <Textarea
+              id="nc-ai-resume"
+              rows={4}
+              value={resumeText}
+              onChange={(e) => {
+                setResumeText(e.target.value);
+                if (aiError) setAiError(null);
+              }}
+              placeholder="Paste the resume text — name, years of experience, skills, certifications…"
+              className="mt-1"
+            />
+            <FieldError id="nc-ai-resume-error">{aiError ?? undefined}</FieldError>
+            <div className="mt-2 flex items-center justify-between gap-3">
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                onClick={autofillFromResume}
+                loading={aiPending}
+              >
+                Auto-fill from resume
+              </Button>
+              {aiFilled ? (
+                <span className="text-[12px] font-medium text-emerald-700">
+                  Filled by AI — review before saving
+                </span>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
 
         <div
           key={current.id}

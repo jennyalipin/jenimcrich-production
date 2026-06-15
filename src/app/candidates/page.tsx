@@ -13,6 +13,7 @@ import {
   type Stage,
 } from "@/lib/data";
 import { matchScore } from "@/lib/scoring";
+import { DEFAULT_SKILL_DICTIONARY } from "@/lib/jd-parser";
 import type { CandidateFilters as CandidateQueryFilters } from "@/lib/data";
 import { AddCandidateButton } from "./_components/add-candidate-button";
 import { CandidateFilters } from "./_components/candidate-filters";
@@ -90,6 +91,22 @@ export default async function CandidatesPage({
   ]);
 
   const rows = pageRows.map(toRow);
+
+  // Live skill dictionary for AI resume auto-fill: prototype defaults plus every
+  // skill on an open job (deduped case-insensitively). Same idea as Matchmaker.
+  const seenSkills = new Set<string>();
+  const skillDictionary: string[] = [];
+  for (const skill of [
+    ...DEFAULT_SKILL_DICTIONARY,
+    ...openJobs.flatMap((job) => job.skills.map((s) => s.skill)),
+  ]) {
+    const key = skill.toLowerCase();
+    if (!seenSkills.has(key)) {
+      seenSkills.add(key);
+      skillDictionary.push(skill);
+    }
+  }
+
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const from = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
   const to = Math.min(page * PAGE_SIZE, total);
@@ -110,6 +127,7 @@ export default async function CandidatesPage({
             <ExportCandidatesButton filters={queryFilters} />
             <AddCandidateButton
               jobs={openJobs.map((j) => ({ id: j.id, title: j.title, clientName: j.client_name }))}
+              skillDictionary={skillDictionary}
             />
           </div>
         </div>
