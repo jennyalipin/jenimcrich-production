@@ -34,12 +34,19 @@ export function AppShell({ children }: { children: ReactNode }) {
         <Sidebar />
         <div className="flex min-w-0 flex-1 flex-col">
           <Topbar />
-          <main id="main-content" className="min-w-0 flex-1 overflow-y-auto">
+          {/* overflow-x-hidden clips any horizontal overflow at the scroll
+             region so it can never scroll the whole page (and drag the sidebar
+             off); wide content scrolls inside its own container (board, tables). */}
+          <main id="main-content" className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto">
             {/* Re-keyed per route so content gently fades/rises in on navigate
-               (reduced-motion users get an instant render via globals.css). */}
+               (reduced-motion users get an instant render via globals.css).
+               h-full (definite, = main's height) gives full-height pages (the
+               pipeline board) a fixed height to fill so their columns cap at the
+               viewport and scroll internally; taller pages overflow this box and
+               main scrolls them normally. */}
             <div
               key={pathname}
-              className="animate-in fade-in-0 slide-in-from-bottom-1 duration-300"
+              className="flex h-full flex-col animate-in fade-in-0 slide-in-from-bottom-1 duration-300"
             >
               {children}
             </div>

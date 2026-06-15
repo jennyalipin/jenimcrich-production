@@ -7,10 +7,12 @@ export function scoreBand(score: number): ScoreBand {
   return score >= 80 ? "high" : score >= 60 ? "mid" : "low";
 }
 
+// Tinted fill + ink text + a same-hue hairline ring (inset) so the signature
+// chip reads as a deliberate, slightly-raised object rather than a flat fill.
 const bandClass: Record<ScoreBand, string> = {
-  high: "bg-primary-soft text-primary-ink",
-  mid: "bg-warning-soft text-warning-ink",
-  low: "bg-danger-soft text-danger-ink",
+  high: "bg-primary-soft text-primary-ink shadow-[inset_0_0_0_1px_rgb(5_150_105/0.22)]",
+  mid: "bg-warning-soft text-warning-ink shadow-[inset_0_0_0_1px_rgb(217_119_6/0.22)]",
+  low: "bg-danger-soft text-danger-ink shadow-[inset_0_0_0_1px_rgb(220_38_38/0.2)]",
 };
 
 export interface ScorePillProps {

@@ -56,3 +56,6 @@ next-env.d.ts
 
 # local design reference screenshots
 /design-refs/
+
+# useAnimations icon pack (raw download; used .json extracted into src/lib/lottie/)
+useanimations/

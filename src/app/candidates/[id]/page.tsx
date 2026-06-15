@@ -33,7 +33,9 @@ import {
 } from "@/lib/data";
 import { formatDate, formatDateTime, formatDayLabel, formatTime } from "@/lib/format";
 import { matchScore, rankJobs } from "@/lib/scoring";
-import type { MatchResult } from "@/lib/types";
+import type { MatchResult, ScoreCandidateInput, ScoreJobInput } from "@/lib/types";
+import { ExplainScore } from "@/components/scoring/score-explanation";
+import { ScoringDisclosure } from "@/components/scoring/scoring-disclosure";
 import { ActivityTimeline } from "../_components/activity-timeline";
 import { CandidateHeader } from "../_components/candidate-header";
 import { CandidateTabs, TabJumpButton } from "../_components/candidate-tabs";
@@ -55,8 +57,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const profile = await getCandidate(id);
   return {
     title: profile
-      ? `${profile.full_name} — Candidates — JeniMcRich Recruitment`
-      : "Candidate not found — JeniMcRich Recruitment",
+      ? `${profile.full_name} — Candidates — Jenny Mcrich Recruitment`
+      : "Candidate not found — Jenny Mcrich Recruitment",
   };
 }
 
@@ -107,7 +109,17 @@ function Stars({ value }: { value: number }) {
   );
 }
 
-function MatchCard({ jobTitle, match }: { jobTitle: string; match: MatchResult }) {
+function MatchCard({
+  jobTitle,
+  match,
+  candidate,
+  job,
+}: {
+  jobTitle: string;
+  match: MatchResult;
+  candidate: ScoreCandidateInput;
+  job: ScoreJobInput;
+}) {
   return (
     <Card>
       <CardBody>
@@ -153,6 +165,7 @@ function MatchCard({ jobTitle, match }: { jobTitle: string; match: MatchResult }
             </ul>
           </div>
         </div>
+        <ExplainScore candidate={candidate} job={job} className="mt-3 border-t border-slate-100 pt-2.5" />
       </CardBody>
     </Card>
   );
@@ -315,9 +328,10 @@ function OverviewTab({
   appMatches: Array<{ app: CandidateProfile["applications"][number]; match: MatchResult }>;
   openRoleMatches: Array<{ job: { id: string; title: string; client: string }; match: MatchResult }>;
 }) {
+  const scoreInput = toScoreCandidate(profile);
   return (
     <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-      <Card className="self-start">
+      <Card className="self-start lg:sticky lg:top-6">
         <CardBody className="space-y-5">
           <section>
             <h3 className="micro-label mb-1.5 text-slate-500">Profile summary</h3>
@@ -389,7 +403,15 @@ function OverviewTab({
       </Card>
 
       <div className="space-y-5">
-        {primary ? <MatchCard jobTitle={primary.app.job.title} match={primary.match} /> : null}
+        <ScoringDisclosure />
+        {primary ? (
+          <MatchCard
+            jobTitle={primary.app.job.title}
+            match={primary.match}
+            candidate={scoreInput}
+            job={toScoreJob(primary.app.job)}
+          />
+        ) : null}
 
         <Card>
           <CardHeader>
@@ -413,33 +435,36 @@ function OverviewTab({
             ) : (
               <ul className="divide-y divide-slate-100">
                 {appMatches.map(({ app, match }) => (
-                  <li key={app.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5 first:pt-0 last:pb-0">
-                    <div>
-                      <p className="text-[13px] font-semibold text-slate-800">
-                        {app.job.title}{" "}
-                        {isRestrictiveVisa(app.job.visa) ? (
-                          <Badge variant="visa" title={VISA_LABELS[app.job.visa]}>
-                            {VISA_LABELS[app.job.visa]}
-                          </Badge>
-                        ) : null}
-                      </p>
-                      <p className="text-[12px] text-slate-500">{app.job.client_name}</p>
-                    </div>
-                    <span className="flex items-center gap-2">
-                      <ScorePill score={match.score} />
-                      <StageBadge stage={app.stage} />
-                      <span
-                        className={cn(
-                          "inline-flex items-center gap-1 text-[12px] tabular-nums",
-                          app.is_stalled ? "font-bold text-warning-ink" : "text-slate-500",
-                        )}
-                      >
-                        {app.days_in_stage}d
-                        {app.is_stalled ? (
-                          <Icon name="stalled" size={13} label="Stalled" className="text-warning-ink" />
-                        ) : null}
+                  <li key={app.id} className="py-2.5 first:pt-0 last:pb-0">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <p className="text-[13px] font-semibold text-slate-800">
+                          {app.job.title}{" "}
+                          {isRestrictiveVisa(app.job.visa) ? (
+                            <Badge variant="visa" title={VISA_LABELS[app.job.visa]}>
+                              {VISA_LABELS[app.job.visa]}
+                            </Badge>
+                          ) : null}
+                        </p>
+                        <p className="text-[12px] text-slate-500">{app.job.client_name}</p>
+                      </div>
+                      <span className="flex items-center gap-2">
+                        <ScorePill score={match.score} />
+                        <StageBadge stage={app.stage} />
+                        <span
+                          className={cn(
+                            "inline-flex items-center gap-1 text-[12px] tabular-nums",
+                            app.is_stalled ? "font-bold text-warning-ink" : "text-slate-500",
+                          )}
+                        >
+                          {app.days_in_stage}d
+                          {app.is_stalled ? (
+                            <Icon name="stalled" size={13} label="Stalled" className="text-warning-ink" />
+                          ) : null}
+                        </span>
                       </span>
-                    </span>
+                    </div>
+                    <ExplainScore candidate={scoreInput} job={toScoreJob(app.job)} className="mt-2" />
                   </li>
                 ))}
               </ul>
@@ -455,9 +480,9 @@ function OverviewTab({
             {openRoleMatches.length === 0 ? (
               <p className="text-[13px] text-slate-500">No open roles right now.</p>
             ) : (
-              <ul className="divide-y divide-slate-100">
+              <ul className="max-h-72 divide-y divide-slate-100 overflow-y-auto scrollbar-slim">
                 {openRoleMatches.map(({ job, match }) => (
-                  <li key={job.id} className="flex items-center justify-between gap-3 py-2 first:pt-0 last:pb-0">
+                  <li key={job.id} className="flex items-center justify-between gap-3 py-2 first:pt-0 last:pb-0 pr-1">
                     <span className="min-w-0">
                       <span className="block truncate text-[13px] text-slate-700">{job.title}</span>
                       <span className="block text-[11.5px] text-slate-500">{job.client}</span>

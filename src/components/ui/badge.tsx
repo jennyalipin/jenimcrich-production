@@ -14,13 +14,14 @@ export type BadgeVariant =
 export const badgeBaseClass =
   "inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11.5px] font-semibold leading-4";
 
+// Each chip carries a same-hue hairline ring (inset) for crafted definition.
 const variantClass: Record<BadgeVariant, string> = {
-  default: "bg-slate-200 text-slate-700",
-  success: "bg-primary-soft text-primary-ink",
-  warning: "bg-warning-soft text-warning-ink",
-  danger: "bg-danger-soft text-danger-ink",
-  info: "bg-info-soft text-info-ink",
-  visa: "bg-warning-soft text-warning-ink",
+  default: "bg-slate-200 text-slate-700 shadow-[inset_0_0_0_1px_rgb(15_23_42/0.1)]",
+  success: "bg-primary-soft text-primary-ink shadow-[inset_0_0_0_1px_rgb(5_150_105/0.2)]",
+  warning: "bg-warning-soft text-warning-ink shadow-[inset_0_0_0_1px_rgb(217_119_6/0.2)]",
+  danger: "bg-danger-soft text-danger-ink shadow-[inset_0_0_0_1px_rgb(220_38_38/0.18)]",
+  info: "bg-info-soft text-info-ink shadow-[inset_0_0_0_1px_rgb(2_132_199/0.2)]",
+  visa: "bg-warning-soft text-warning-ink shadow-[inset_0_0_0_1px_rgb(217_119_6/0.2)]",
 };
 
 export interface BadgeProps {

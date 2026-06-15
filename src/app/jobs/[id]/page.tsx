@@ -131,9 +131,10 @@ export default async function JobDetailPage({
     <div className="p-6">
       <Link
         href="/jobs"
-        className="text-[13px] font-semibold text-primary hover:text-primary-strong hover:underline"
+        className="inline-flex items-center gap-1 text-[13px] font-semibold text-primary hover:text-primary-strong hover:underline"
       >
-        ← Back to jobs
+        <Icon name="chevronRight" size={15} className="rotate-180" />
+        Back to jobs
       </Link>
 
       {/* Overview */}
@@ -191,7 +192,7 @@ export default async function JobDetailPage({
       </Card>
 
       {/* KPIs */}
-      <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mt-4 grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           label="Total applicants"
           value={total}

@@ -19,7 +19,7 @@ import {
 } from "./templates-view";
 
 export const metadata: Metadata = {
-  title: "Email Templates — JeniMcRich Recruitment",
+  title: "Email Templates — Jenny Mcrich Recruitment",
 };
 
 /**

@@ -1,4 +1,5 @@
 import { getCandidates, getJobs } from "@/lib/data";
+import { ScoringDisclosure } from "@/components/scoring/scoring-disclosure";
 import { DEFAULT_SKILL_DICTIONARY } from "@/lib/jd-parser";
 import {
   MatchmakerClient,
@@ -7,7 +8,7 @@ import {
 } from "./matchmaker-client";
 import type { Metadata } from "next";
 
-export const metadata: Metadata = { title: "Matchmaker — JeniMcRich Recruitment" };
+export const metadata: Metadata = { title: "Matchmaker — Jenny Mcrich Recruitment" };
 
 /** Jobs/candidates mutate in-memory via other pages' actions — stay fresh. */
 export const dynamic = "force-dynamic";
@@ -65,7 +66,8 @@ export default async function MatchmakerPage() {
   }
 
   return (
-    <div className="p-6">
+    <div className="space-y-4 p-6">
+      <ScoringDisclosure />
       <MatchmakerClient
         jobs={jobs}
         candidates={matchCandidates}

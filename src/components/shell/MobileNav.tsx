@@ -46,9 +46,9 @@ export function MobileNav() {
       >
         <SheetHeader className="border-b border-slate-800 p-4">
           <SheetTitle className="flex items-center gap-2.5 text-white">
-            <LogoMark size={28} />
+            <LogoMark size={28} variant="onDark" />
             <span className="text-[15px] font-bold tracking-[-0.01em]">
-              JeniMc<span className="serif-accent font-medium text-emerald-400">Rich</span>
+              Jenny Mcrich
             </span>
           </SheetTitle>
         </SheetHeader>

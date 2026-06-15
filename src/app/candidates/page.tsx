@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
-import { Card } from "@/components/ui";
+import Link from "next/link";
+import { Card, Icon, cn } from "@/components/ui";
 import {
   STAGES,
-  getCandidates,
+  getCandidatesPage,
+  getCandidateTags,
   getJobs,
   isRestrictiveVisa,
   toScoreCandidate,
@@ -11,12 +13,15 @@ import {
   type Stage,
 } from "@/lib/data";
 import { matchScore } from "@/lib/scoring";
+import type { CandidateFilters as CandidateQueryFilters } from "@/lib/data";
 import { AddCandidateButton } from "./_components/add-candidate-button";
 import { CandidateFilters } from "./_components/candidate-filters";
 import { CandidatesTable } from "./_components/candidates-table";
+import { ExportCandidatesButton } from "./_components/export-button";
+import { ImportCandidatesButton } from "./_components/import-button";
 import type { CandidateListRow } from "./_lib/view-types";
 
-export const metadata: Metadata = { title: "Candidates — JeniMcRich Recruitment" };
+export const metadata: Metadata = { title: "Candidates — Jenny Mcrich Recruitment" };
 
 // The demo store mutates between requests — always render fresh.
 export const dynamic = "force-dynamic";
@@ -69,20 +74,25 @@ export default async function CandidatesPage({
   const tags = toArray(sp.tag);
   const flagged = sp.flagged === "1";
 
-  const [filtered, everyone, openJobs] = await Promise.all([
-    getCandidates({
-      q: q.trim() || undefined,
-      stages: stages.length > 0 ? stages : undefined,
-      tags: tags.length > 0 ? tags : undefined,
-      flagged_only: flagged || undefined,
-    }),
-    getCandidates(),
+  const page = Math.max(1, Number.parseInt(typeof sp.page === "string" ? sp.page : "", 10) || 1);
+
+  const queryFilters: CandidateQueryFilters = {
+    q: q.trim() || undefined,
+    stages: stages.length > 0 ? stages : undefined,
+    tags: tags.length > 0 ? tags : undefined,
+    flagged_only: flagged || undefined,
+  };
+
+  const [{ rows: pageRows, total }, allTags, openJobs] = await Promise.all([
+    getCandidatesPage(queryFilters, page, PAGE_SIZE),
+    getCandidateTags(),
     getJobs({ status: "open" }),
   ]);
 
-  const allTags = [...new Set(everyone.flatMap((c) => c.tags))].sort();
-  const rows = filtered.map(toRow);
-  const shown = rows.length;
+  const rows = pageRows.map(toRow);
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const from = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const to = Math.min(page * PAGE_SIZE, total);
 
   return (
     <div className="flex flex-col gap-5 p-6 lg:flex-row lg:items-start">
@@ -91,16 +101,77 @@ export default async function CandidatesPage({
       <section className="min-w-0 flex-1 space-y-3" aria-label="Candidate list">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-[13px] text-slate-500">
-            {shown} candidate{shown === 1 ? "" : "s"} shown · sorted by match score
+            {total === 0
+              ? "No candidates match these filters"
+              : `Showing ${from}–${to} of ${total} candidate${total === 1 ? "" : "s"}`}
           </p>
-          <AddCandidateButton
-            jobs={openJobs.map((j) => ({ id: j.id, title: j.title, clientName: j.client_name }))}
-          />
+          <div className="flex items-center gap-2">
+            <ImportCandidatesButton />
+            <ExportCandidatesButton filters={queryFilters} />
+            <AddCandidateButton
+              jobs={openJobs.map((j) => ({ id: j.id, title: j.title, clientName: j.client_name }))}
+            />
+          </div>
         </div>
         <Card>
           <CandidatesTable rows={rows} />
         </Card>
+        {totalPages > 1 ? (
+          <nav
+            aria-label="Candidate pages"
+            className="flex items-center justify-between gap-3 px-1 pt-1 text-[13px]"
+          >
+            <PageLink href={pageHref(sp, page - 1)} disabled={page <= 1} dir="prev" />
+            <span className="text-slate-500">
+              Page {page} of {totalPages}
+            </span>
+            <PageLink href={pageHref(sp, page + 1)} disabled={page >= totalPages} dir="next" />
+          </nav>
+        ) : null}
       </section>
     </div>
+  );
+}
+
+const PAGE_SIZE = 25;
+
+/** Build a /candidates URL preserving the active filters at a given page. */
+function pageHref(sp: SearchParams, page: number): string {
+  const params = new URLSearchParams();
+  if (typeof sp.q === "string" && sp.q) params.set("q", sp.q);
+  for (const s of toArray(sp.stage)) params.append("stage", s);
+  for (const t of toArray(sp.tag)) params.append("tag", t);
+  if (sp.flagged === "1") params.set("flagged", "1");
+  if (page > 1) params.set("page", String(page));
+  const qs = params.toString();
+  return qs ? `/candidates?${qs}` : "/candidates";
+}
+
+function PageLink({ href, disabled, dir }: { href: string; disabled: boolean; dir: "prev" | "next" }) {
+  const label = dir === "prev" ? "Previous" : "Next";
+  const cls = cn(
+    "inline-flex items-center gap-1.5 rounded-control border px-3 py-1.5 font-medium transition-colors",
+    disabled
+      ? "pointer-events-none border-slate-200 text-slate-300"
+      : "border-slate-300 text-slate-600 hover:border-slate-400 hover:bg-slate-50",
+  );
+  const content =
+    dir === "prev" ? (
+      <>
+        <Icon name="chevronRight" size={15} className="rotate-180" /> {label}
+      </>
+    ) : (
+      <>
+        {label} <Icon name="chevronRight" size={15} />
+      </>
+    );
+  return disabled ? (
+    <span className={cls} aria-disabled="true">
+      {content}
+    </span>
+  ) : (
+    <Link href={href} className={cls}>
+      {content}
+    </Link>
   );
 }

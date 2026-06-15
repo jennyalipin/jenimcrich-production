@@ -1,6 +1,7 @@
 "use client";
 
-import { useId, useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useId, useMemo, useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import {
   Badge,
   Button,
@@ -19,6 +20,7 @@ import {
   useToast,
   type BadgeVariant,
 } from "@/components/ui";
+import { AnimatedTrash } from "@/components/ui/animated-trash";
 import {
   TEMPLATE_CATEGORIES,
   TEMPLATE_CATEGORY_LABELS,
@@ -33,7 +35,16 @@ import {
   type MergeField,
   type MergeValues,
 } from "@/lib/merge";
-import { saveTemplateAction, type SavedTemplate } from "./actions";
+import {
+  deleteTemplateAction,
+  importTemplatesAction,
+  saveTemplateAction,
+  type SavedTemplate,
+} from "./actions";
+import { draftTemplateWithAI } from "./ai-actions";
+
+// NEXT_PUBLIC_* is inlined at build; off by default → no AI button renders.
+const TEMPLATES_AI_ON = process.env.NEXT_PUBLIC_AI_ENABLED === "true";
 
 /* ------------------------------ plain props ------------------------------ */
 
@@ -143,6 +154,17 @@ export function TemplatesView({ templates: initialTemplates, recipients, emailLo
   const [editor, setEditor] = useState<EditorDraft | null>(null);
   const [deleting, setDeleting] = useState<TemplateRecord | null>(null);
   const [bulkOpen, setBulkOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [, startDelete] = useTransition();
+
+  // Reconcile with the database whenever the server re-renders (after a save,
+  // delete, or import revalidates /templates) so ids match persisted rows.
+  // React's endorsed "adjust state during render" pattern — no effect needed.
+  const [syncedFrom, setSyncedFrom] = useState(initialTemplates);
+  if (syncedFrom !== initialTemplates) {
+    setSyncedFrom(initialTemplates);
+    setTemplates(initialTemplates);
+  }
 
   function handleSaved(saved: SavedTemplate) {
     const isUpdate = templates.some((t) => t.id === saved.id);
@@ -155,9 +177,18 @@ export function TemplatesView({ templates: initialTemplates, recipients, emailLo
 
   function handleDelete() {
     if (!deleting) return;
-    setTemplates((prev) => prev.filter((t) => t.id !== deleting.id));
-    toast.success(`"${deleting.name}" deleted.`);
+    const target = deleting;
+    setTemplates((prev) => prev.filter((t) => t.id !== target.id));
     setDeleting(null);
+    startDelete(async () => {
+      const res = await deleteTemplateAction(target.id);
+      if (!res.ok) {
+        setTemplates((prev) => [...prev, target]);
+        toast.error(res.error ?? "The template could not be deleted.");
+        return;
+      }
+      toast.success(`"${target.name}" deleted.`);
+    });
   }
 
   return (
@@ -172,15 +203,28 @@ export function TemplatesView({ templates: initialTemplates, recipients, emailLo
             ))}
           </div>
           <p className="text-[12px] text-slate-500">
-            The template library loads from the database; edits apply for this
-            session and bulk sending activates once Resend email is connected.
+            Templates are saved to your library and personalize per candidate;
+            bulk sending activates once email is connected.
           </p>
         </div>
         <div className="flex shrink-0 gap-2">
+          <Button variant="ghost" onClick={() => setImportOpen(true)}>
+            <Icon name="document" size={15} /> Import from Gmail
+          </Button>
           <Button
             variant="secondary"
             onClick={() => setBulkOpen(true)}
             disabled={templates.length === 0}
+            title={
+              templates.length === 0
+                ? "Create a template first to send a bulk email"
+                : undefined
+            }
+            aria-label={
+              templates.length === 0
+                ? "Bulk email — create a template first"
+                : "Bulk email"
+            }
           >
             <Icon name="email" size={15} /> Bulk email
           </Button>
@@ -252,6 +296,8 @@ export function TemplatesView({ templates: initialTemplates, recipients, emailLo
         />
       ) : null}
 
+      {importOpen ? <GmailImportModal onClose={() => setImportOpen(false)} /> : null}
+
       <Modal
         open={deleting !== null}
         onClose={() => setDeleting(null)}
@@ -289,6 +335,15 @@ function TemplateCard({
   onDelete: () => void;
 }) {
   const fields = useMemo(() => usedFields(template), [template]);
+  const bodyRef = useRef<HTMLDivElement | null>(null);
+  const [bodyClipped, setBodyClipped] = useState(false);
+  const [deleteHover, setDeleteHover] = useState(false);
+
+  useEffect(() => {
+    const el = bodyRef.current;
+    if (!el) return;
+    setBodyClipped(el.scrollHeight > el.clientHeight + 1);
+  }, [template.body]);
 
   return (
     <Card className="flex flex-col">
@@ -305,8 +360,17 @@ function TemplateCard({
           <span className="font-semibold text-slate-500">Subject:</span>{" "}
           {template.subject}
         </p>
-        <div className="max-h-[118px] overflow-hidden whitespace-pre-wrap rounded-control border border-slate-100 bg-slate-50 p-3 text-[12px] leading-relaxed text-slate-600">
+        <div
+          ref={bodyRef}
+          className="relative max-h-40 overflow-hidden whitespace-pre-wrap rounded-control border border-slate-100 bg-slate-50 p-3 text-[12px] leading-relaxed text-slate-600"
+        >
           {template.body}
+          {bodyClipped ? (
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-slate-50 to-transparent"
+            />
+          ) : null}
         </div>
         {fields.length > 0 ? (
           <div className="flex flex-wrap gap-1">
@@ -319,8 +383,14 @@ function TemplateCard({
           <Button variant="ghost" size="sm" onClick={onEdit}>
             Edit
           </Button>
-          <Button variant="danger" size="sm" onClick={onDelete}>
-            Delete
+          <Button
+            variant="danger"
+            size="sm"
+            onClick={onDelete}
+            onMouseEnter={() => setDeleteHover(true)}
+            onMouseLeave={() => setDeleteHover(false)}
+          >
+            <AnimatedTrash playing={deleteHover} /> Delete
           </Button>
         </div>
       </div>
@@ -345,6 +415,8 @@ function TemplateEditorModal({
   const [draft, setDraft] = useState<EditorDraft>(initial);
   const [formError, setFormError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [aiPending, startAi] = useTransition();
+  const [aiError, setAiError] = useState<string | null>(null);
   const [sampleId, setSampleId] = useState(recipients[0]?.id ?? "");
   const subjectRef = useRef<HTMLInputElement | null>(null);
   const bodyRef = useRef<HTMLTextAreaElement | null>(null);
@@ -383,6 +455,18 @@ function TemplateEditorModal({
         onSaved(result.template);
       } else {
         setFormError(result.error);
+      }
+    });
+  }
+
+  function handleAiDraft() {
+    setAiError(null);
+    startAi(async () => {
+      const res = await draftTemplateWithAI({ purpose: draft.name, category: draft.category });
+      if (res.ok) {
+        setDraft((d) => ({ ...d, subject: res.subject, body: res.body }));
+      } else {
+        setAiError(res.error);
       }
     });
   }
@@ -440,6 +524,23 @@ function TemplateEditorModal({
             </div>
           </div>
 
+          {TEMPLATES_AI_ON ? (
+            <div className="flex flex-wrap items-center gap-2 rounded-card border border-primary-soft bg-primary-faint px-3 py-2">
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                loading={aiPending}
+                onClick={handleAiDraft}
+              >
+                <Icon name="bolt" size={14} /> Draft with AI
+              </Button>
+              <span className={`text-[12px] ${aiError ? "text-danger-ink" : "text-slate-500"}`}>
+                {aiError ?? "Writes a subject & body from the name above — review before saving."}
+              </span>
+            </div>
+          ) : null}
+
           <div>
             <Label htmlFor={`${uid}-subject`} requiredMark>
               Subject
@@ -479,25 +580,25 @@ function TemplateEditorModal({
             <FieldError id={`${uid}-body-error`}>{bodyIssue}</FieldError>
           </div>
 
-          <div>
-            <span className="micro-label mb-1.5 block text-slate-600">
-              Insert merge field
-            </span>
-            <div className="flex flex-wrap gap-1.5">
+          <div className="rounded-card border border-slate-200 bg-slate-50 p-3">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+              <span className="text-[13px] font-bold text-slate-700">
+                Personalize with:
+              </span>
               {MERGE_FIELDS.map((field) => (
                 <button
                   key={field}
                   type="button"
                   onClick={() => insertMergeField(field)}
-                  className="rounded-control border border-slate-200 bg-slate-50 px-2 py-1 font-mono text-[11px] text-slate-600 outline-none transition-colors hover:border-primary hover:bg-primary-faint hover:text-primary-ink focus-visible:ring-[3px] focus-visible:ring-primary-soft"
+                  className="rounded-control border border-slate-200 bg-white px-2 py-1 font-mono text-[11.5px] text-slate-600 outline-none transition-colors hover:border-primary hover:bg-primary-faint hover:text-primary-ink focus-visible:ring-[3px] focus-visible:ring-primary-soft"
                 >
                   {`{{${field}}}`}
                 </button>
               ))}
             </div>
             <p className="mt-1.5 text-[11.5px] text-slate-400">
-              Inserts at the cursor — in the subject or body, wherever you last
-              clicked.
+              Click a field to insert it at the cursor — in the subject or body,
+              wherever you last clicked.
             </p>
           </div>
 
@@ -600,20 +701,28 @@ function BulkComposerModal({
       size="lg"
       footer={
         <>
-          <span className="mr-auto inline-flex items-center gap-1.5 text-[12px] font-medium text-warning-ink">
-            <span aria-hidden="true" className="size-1.5 rounded-full bg-warning" />
-            Connect Resend to enable sending
-          </span>
           <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
-          <Button disabled>
+          <Button disabled title="Connect Resend to enable sending">
             Send {chosen.length} email{chosen.length === 1 ? "" : "s"}
           </Button>
         </>
       }
     >
       <div className="space-y-5">
+        <div
+          role="note"
+          className="flex items-start gap-2.5 rounded-control border border-warning-soft bg-warning-soft px-3.5 py-2.5 text-[12.5px] leading-relaxed text-warning-ink"
+        >
+          <Icon name="email" size={15} className="mt-0.5 shrink-0" />
+          <span>
+            Sending isn&apos;t active yet — connect Resend email to send these
+            messages. You can still select recipients and review every
+            personalized email below.
+          </span>
+        </div>
+
         <div>
           <Label htmlFor={`${uid}-template`}>Template</Label>
           <Select
@@ -657,6 +766,10 @@ function BulkComposerModal({
             </div>
           ) : (
             <div className="max-h-44 divide-y divide-slate-100 overflow-y-auto rounded-control border border-slate-200 scrollbar-slim">
+              {/* Native checkbox here on purpose: the recipient list is
+                 unbounded (scales with candidate count), so per-row Lottie
+                 players would not scale. Animated checkboxes are reserved for
+                 the bounded filter list. */}
               {recipients.map((r) => (
                 <label
                   key={r.id}
@@ -722,14 +835,241 @@ function BulkComposerModal({
   );
 }
 
+/* --------------------------- gmail paste import --------------------------- */
+
+interface StagedTemplate {
+  key: string;
+  name: string;
+  category: TemplateCategory;
+  subject: string;
+  body: string;
+}
+
+/**
+ * No-OAuth path for bringing Gmail canned responses over: paste one in, we lift
+ * the `Subject:` line if present, stage it, repeat, then import the batch.
+ */
+function GmailImportModal({ onClose }: { onClose: () => void }) {
+  const uid = useId();
+  const toast = useToast();
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const [name, setName] = useState("");
+  const [category, setCategory] = useState<TemplateCategory>("update");
+  const [subject, setSubject] = useState("");
+  const [body, setBody] = useState("");
+  const [staged, setStaged] = useState<StagedTemplate[]>([]);
+  const counter = useRef(0);
+
+  const canAdd = name.trim() !== "" && subject.trim() !== "" && body.trim() !== "";
+
+  /** Lift a leading "Subject: …" line out of pasted Gmail text. */
+  function handleBodyPaste(e: React.ClipboardEvent<HTMLTextAreaElement>) {
+    const text = e.clipboardData.getData("text");
+    const match = text.match(/^[ \t]*subject[ \t]*:[ \t]*(.+)$/im);
+    if (!match) return; // let the browser paste normally
+    e.preventDefault();
+    const detected = match[1].trim();
+    if (!subject.trim()) setSubject(detected);
+    if (!name.trim()) setName(detected);
+    setBody(text.replace(/^[ \t]*subject[ \t]*:[ \t]*.+$/im, "").trim());
+  }
+
+  function addToList() {
+    if (!canAdd) {
+      toast.error("Add a name, subject, and body before adding to the list.");
+      return;
+    }
+    counter.current += 1;
+    setStaged((prev) => [
+      ...prev,
+      {
+        key: `stage-${counter.current}`,
+        name: name.trim(),
+        category,
+        subject: subject.trim(),
+        body: body.trim(),
+      },
+    ]);
+    setName("");
+    setSubject("");
+    setBody("");
+    setCategory("update");
+  }
+
+  function removeStaged(key: string) {
+    setStaged((prev) => prev.filter((s) => s.key !== key));
+  }
+
+  function runImport() {
+    if (staged.length === 0) return;
+    start(async () => {
+      const res = await importTemplatesAction(
+        staged.map(({ name, category, subject, body }) => ({ name, category, subject, body })),
+      );
+      if (res.imported === 0 && res.errors > 0) {
+        toast.error("Import failed — check the templates and try again.");
+        return;
+      }
+      const parts = [`Imported ${res.imported}`];
+      if (res.skipped) {
+        parts.push(`skipped ${res.skipped} duplicate${res.skipped === 1 ? "" : "s"}`);
+      }
+      toast.success(`${parts.join(" · ")}.`);
+      router.refresh();
+      onClose();
+    });
+  }
+
+  return (
+    <Modal
+      open
+      onClose={() => {
+        if (!pending) onClose();
+      }}
+      title="Import templates from Gmail"
+      size="lg"
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose} disabled={pending}>
+            Cancel
+          </Button>
+          <Button onClick={runImport} loading={pending} disabled={staged.length === 0}>
+            {staged.length > 0
+              ? `Import ${staged.length} template${staged.length === 1 ? "" : "s"}`
+              : "Import"}
+          </Button>
+        </>
+      }
+    >
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Paste form */}
+        <div className="space-y-4">
+          <p className="text-[12.5px] leading-relaxed text-slate-600">
+            In Gmail, open a canned response or saved email and copy it. Paste it
+            below — if the text starts with a{" "}
+            <code className={chipClass}>Subject:</code> line we&apos;ll detect it.
+            Add as many as you like, then import them all at once.
+          </p>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <Label htmlFor={`${uid}-name`} requiredMark>
+                Name
+              </Label>
+              <Input
+                id={`${uid}-name`}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. Phone screen invite"
+              />
+            </div>
+            <div>
+              <Label htmlFor={`${uid}-category`}>Category</Label>
+              <Select
+                id={`${uid}-category`}
+                value={category}
+                onChange={(e) => setCategory(e.target.value as TemplateCategory)}
+              >
+                {TEMPLATE_CATEGORIES.map((c) => (
+                  <option key={c} value={c}>
+                    {TEMPLATE_CATEGORY_LABELS[c]}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          </div>
+
+          <div>
+            <Label htmlFor={`${uid}-subject`} requiredMark>
+              Subject
+            </Label>
+            <Input
+              id={`${uid}-subject`}
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+              placeholder="Interview invitation"
+            />
+          </div>
+
+          <div>
+            <Label htmlFor={`${uid}-body`} requiredMark>
+              Body
+            </Label>
+            <Textarea
+              id={`${uid}-body`}
+              rows={8}
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              onPaste={handleBodyPaste}
+              placeholder="Paste the email text here…"
+            />
+            <p className="mt-1 text-[11.5px] text-slate-400">
+              Tip: add <code className={chipClass}>{"{{candidate_name}}"}</code> and
+              other merge fields after importing to personalize it.
+            </p>
+          </div>
+
+          <Button variant="secondary" onClick={addToList} disabled={!canAdd}>
+            + Add to import list
+          </Button>
+        </div>
+
+        {/* Staged list */}
+        <div className="space-y-2">
+          <span className="micro-label text-slate-500">
+            Ready to import · {staged.length}
+          </span>
+          {staged.length === 0 ? (
+            <div className="rounded-card border border-dashed border-slate-300 p-6 text-center text-[12.5px] text-slate-400">
+              Templates you add appear here. Nothing is saved until you import.
+            </div>
+          ) : (
+            <ul className="space-y-2">
+              {staged.map((s) => (
+                <li
+                  key={s.key}
+                  className="rounded-control border border-slate-200 bg-slate-50 p-3"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="text-[13px] font-semibold text-ink">{s.name}</span>
+                    <button
+                      type="button"
+                      className="shrink-0 text-[12px] font-medium text-danger hover:underline"
+                      onClick={() => removeStaged(s.key)}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                  <p className="mt-0.5 text-[12px] text-slate-500">
+                    <span className="font-medium">Subject:</span> {s.subject}
+                  </p>
+                  <p className="mt-1 line-clamp-2 text-[12px] leading-relaxed text-slate-500">
+                    {s.body}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 /* ------------------------------ email log ------------------------------ */
 
 function EmailLogCard({ rows }: { rows: EmailLogRow[] }) {
+  const shown = Math.min(rows.length, 15);
   return (
     <Card>
       <CardHeader>
         <CardTitle>Sent email log</CardTitle>
-        <Badge>{rows.length} logged</Badge>
+        <Badge>
+          {rows.length > 15
+            ? `Showing ${shown} of ${rows.length}`
+            : `${rows.length} logged`}
+        </Badge>
       </CardHeader>
       {rows.length === 0 ? (
         <EmptyState
@@ -780,7 +1120,7 @@ function EmailLogCard({ rows }: { rows: EmailLogRow[] }) {
           </div>
           {rows.length > 15 ? (
             <div className="border-t border-slate-100 px-5 py-2.5 text-[12px] text-slate-400">
-              Showing the 15 most recent of {rows.length} logged emails.
+              Only the 15 most recent emails are shown here.
             </div>
           ) : null}
         </>

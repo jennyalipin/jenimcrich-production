@@ -43,8 +43,7 @@ export function DataCard() {
             This workspace is connected to Supabase: jobs, candidates, notes,
             interviews and email history are stored in the database and persist
             across sessions and restarts. Access is enforced per user by
-            row-level security. The candidate records shown are fictional
-            sample data.
+            row-level security.
           </p>
         ) : (
           <>

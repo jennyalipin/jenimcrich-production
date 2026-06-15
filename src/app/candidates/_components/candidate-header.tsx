@@ -20,6 +20,7 @@ import { initials } from "@/lib/format";
 import { STAGES, STAGE_LABELS, type Stage } from "@/lib/data/types";
 import { addTag, removeTag, setArchived, toggleFlag, updateApplicationStage } from "../actions";
 import type { CandidateHeaderData } from "../_lib/view-types";
+import { AnimatedFlagStar } from "./animated-flag-star";
 
 /**
  * Profile header: identity, flag toggle, tags editor, match/interview pills,
@@ -138,7 +139,7 @@ export function CandidateHeader({ data }: { data: CandidateHeaderData }) {
                       data.flagged ? "text-amber-400" : "text-slate-300 hover:text-amber-300",
                     )}
                   >
-                    <Icon name="star" size={20} fill={data.flagged} />
+                    <AnimatedFlagStar flagged={data.flagged} />
                   </button>
                   {data.primary?.restrictiveVisa && data.primary.visaLabel ? (
                     <Badge variant="visa" title="Restrictive work-authorization requirement on the applied role">

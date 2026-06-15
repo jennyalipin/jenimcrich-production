@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useId, useState, type ReactNode } from "react";
 import { Badge, Card, CardBody, Icon, ScorePill, cn } from "@/components/ui";
 import type { MatchResult, ScoreCandidateInput, ScoreJobInput } from "@/lib/types";
-import { explainScore, round1 } from "./explain";
+import { ScoreExplanationTable } from "@/components/scoring/score-explanation";
 
 const LIST_LIMIT = 4;
 
@@ -80,9 +80,7 @@ export function MatchCard({
               {pros.length > 0 ? (
                 pros.map((pro) => (
                   <li key={pro} className="flex gap-2">
-                    <span aria-hidden="true" className="font-bold text-primary">
-                      ✓
-                    </span>
+                    <Icon name="check" size={14} aria-hidden className="mt-0.5 shrink-0 text-primary" />
                     <span>{pro}</span>
                   </li>
                 ))
@@ -93,7 +91,7 @@ export function MatchCard({
             </ul>
           </div>
           <div>
-            <p className="micro-label text-slate-500">Cons / Gaps</p>
+            <p className="micro-label text-slate-500">Gaps</p>
             <ul className="mt-1 space-y-1 text-[13px] text-slate-700">
               {cons.length > 0 ? (
                 cons.map((con) => (
@@ -102,23 +100,23 @@ export function MatchCard({
                     <span>{con}</span>
                   </li>
                 ))
-              ) : (
+              ) : null}
+              {match.gaps.length > 0 ? (
+                <li className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                  <span className="text-slate-400">Missing skills:</span>
+                  {match.gaps.map((gap) => (
+                    <Badge key={gap} variant="danger">
+                      {gap}
+                    </Badge>
+                  ))}
+                </li>
+              ) : null}
+              {cons.length === 0 && match.gaps.length === 0 ? (
                 <li className="text-slate-400">None identified</li>
-              )}
+              ) : null}
             </ul>
           </div>
         </div>
-
-        {match.gaps.length > 0 ? (
-          <div className="mt-3 flex flex-wrap items-center gap-1.5 text-[12px]">
-            <span className="font-semibold text-slate-600">Skill gaps:</span>
-            {match.gaps.map((gap) => (
-              <Badge key={gap} variant="danger">
-                {gap}
-              </Badge>
-            ))}
-          </div>
-        ) : null}
 
         <div className="mt-3 flex items-center justify-between gap-3 border-t border-slate-100 pt-2.5">
           <button
@@ -146,70 +144,12 @@ export function MatchCard({
           ) : null}
         </div>
 
-        {expanded ? <ScoreBreakdown id={panelId} candidate={candidate} job={job} /> : null}
+        {expanded ? (
+          <div className="mt-2.5">
+            <ScoreExplanationTable id={panelId} candidate={candidate} job={job} />
+          </div>
+        ) : null}
       </CardBody>
     </Card>
-  );
-}
-
-/** Point-by-point table mirroring lib/scoring's math (domain rule 2). */
-function ScoreBreakdown({
-  id,
-  candidate,
-  job,
-}: {
-  id: string;
-  candidate: ScoreCandidateInput;
-  job: ScoreJobInput;
-}) {
-  const explanation = explainScore(candidate, job);
-
-  return (
-    <div id={id} className="mt-2.5 overflow-hidden rounded-[10px] border border-slate-200">
-      <table className="w-full border-collapse text-left text-[12px]">
-        <thead>
-          <tr className="bg-slate-50">
-            <th scope="col" className="micro-label px-3 py-2 text-slate-500">
-              Component
-            </th>
-            <th scope="col" className="micro-label px-3 py-2 text-slate-500">
-              How it scored
-            </th>
-            <th scope="col" className="micro-label px-3 py-2 text-right text-slate-500">
-              Points
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {explanation.rows.map((row) => (
-            <tr key={row.label} className="border-t border-slate-100">
-              <td className="px-3 py-1.5 font-semibold whitespace-nowrap text-slate-700">
-                {row.label}
-              </td>
-              <td className="px-3 py-1.5 text-slate-500">{row.detail}</td>
-              <td
-                className={cn(
-                  "px-3 py-1.5 text-right font-semibold tabular-nums whitespace-nowrap",
-                  row.earned === 0 ? "text-danger-strong" : "text-slate-700",
-                )}
-              >
-                {round1(row.earned)} / {row.possible}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-        <tfoot>
-          <tr className="border-t border-slate-200 bg-slate-50">
-            <td className="px-3 py-2 font-bold text-ink">Total</td>
-            <td className="px-3 py-2 text-slate-500">
-              round({round1(explanation.earned)} ÷ {explanation.possible} × 100)
-            </td>
-            <td className="px-3 py-2 text-right font-bold tabular-nums text-ink">
-              {explanation.score} / 100
-            </td>
-          </tr>
-        </tfoot>
-      </table>
-    </div>
   );
 }

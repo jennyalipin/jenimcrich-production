@@ -96,6 +96,7 @@ const columns: ReadonlyArray<DataTableColumn<CandidateListRow>> = [
         {r.moreSkills > 0 ? <span className="text-[11px] text-slate-500">+{r.moreSkills}</span> : null}
       </span>
     ),
+    className: "hidden lg:table-cell",
   },
   {
     key: "years",
@@ -120,6 +121,7 @@ const columns: ReadonlyArray<DataTableColumn<CandidateListRow>> = [
           ))}
         </span>
       ),
+    className: "hidden lg:table-cell",
   },
   {
     key: "instage",

@@ -1,50 +1,68 @@
 /**
- * Brand logo for JeniMcRich Recruitment.
+ * Brand logo for Jenny Mcrich Recruitment.
  *
- * `LogoMark` is a crafted SVG symbol — two ascending chevron bands, reading as
- * upward movement / placement (a candidate advanced into a role). It is NOT a
- * lettered monogram-in-a-box. `Logo` pairs the mark with the wordmark, with
- * "Rich" set in the Signifier serif accent.
+ * `LogoMark` is the brand symbol — a "j" built from two figures: a smaller
+ * accent person ascending beside a taller figure, reading as placement /
+ * advancement (a candidate moved into a role). It is NOT a lettered
+ * monogram-in-a-box.
+ *
+ * Variants mirror the delivered asset set (public/brand):
+ *   - "color"  two-tone emerald + slate — full-colour mark on light surfaces
+ *   - "onDark" two-tone, slate figure → white + brighter emerald, on dark chrome
+ *   - "light"  monochrome slate — one-colour use on light surfaces
+ *   - "dark"   monochrome white — one-colour use on dark surfaces
+ *
+ * `Logo` pairs the mark with the "Jenny Mcrich" wordmark.
  */
 
 import { cn } from "./cn";
 
+export type LogoVariant = "color" | "onDark" | "light" | "dark";
+
+// Per-variant fills: `figure` = taller "j" body+head, `accent` = the smaller
+// ascending figure. Mono variants paint both the same colour.
+const VARIANT_FILLS: Record<LogoVariant, { figure: string; accent: string }> = {
+  color: { figure: "#0c182c", accent: "#038f61" },
+  onDark: { figure: "#ffffff", accent: "#10b981" },
+  light: { figure: "#0c172b", accent: "#0c172b" },
+  dark: { figure: "#ffffff", accent: "#ffffff" },
+};
+
 export function LogoMark({
   size = 28,
   className,
-  title = "JeniMcRich",
+  title = "Jenny Mcrich",
+  variant = "color",
 }: {
   size?: number;
   className?: string;
   title?: string;
+  variant?: LogoVariant;
 }) {
+  const { figure, accent } = VARIANT_FILLS[variant];
   return (
     <svg
       width={size}
       height={size}
-      viewBox="0 0 28 28"
+      // Tight square crop around the (tall, narrow) mark for optical sizing.
+      viewBox="172 172 680 680"
       fill="none"
       role="img"
       aria-label={title}
       className={className}
     >
-      <defs>
-        <linearGradient id="jmr-mark" x1="4" y1="3" x2="24" y2="22" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#10b981" />
-          <stop offset="1" stopColor="#0d9488" />
-        </linearGradient>
-      </defs>
-      {/* upper chevron band */}
+      {/* taller figure — the body + head of the "j" */}
       <path
-        d="M14 3.2 L24 11.6 L20.2 11.6 L14 6.4 L7.8 11.6 L4 11.6 Z"
-        fill="url(#jmr-mark)"
+        fill={figure}
+        d="M520.38,811.63l.34-155.66c.07-32.3,30.7-63.53,64.85-65.78-34.91-2.99-63.1-30.96-65.18-66.53l-.02-154.86h142.23s-.02,304.71-.02,304.71c-.66,37.1-15.45,71.03-41.98,96.46-26.1,26.92-61.27,42.04-100.22,41.65Z"
       />
-      {/* lower chevron band */}
+      <circle fill={figure} cx="591.49" cy="282.72" r="71.07" />
+      {/* smaller accent figure ascending alongside */}
       <path
-        d="M14 11.8 L24 20.2 L20.2 20.2 L14 15 L7.8 20.2 L4 20.2 Z"
-        fill="url(#jmr-mark)"
-        opacity="0.55"
+        fill={accent}
+        d="M504.07,657.21l.23,154.41c-38.13.5-73.87-14.38-100.26-41.65-26.4-25.44-41.79-59.33-41.85-96.33l-.13-82.48,82.81.39c14.86.07,27.25,9.37,37.98,18.57,12.22,12.78,21.19,28.12,21.22,47.1Z"
       />
+      <circle fill={accent} cx="433.18" cy="509.04" r="71.06" />
     </svg>
   );
 }
@@ -54,7 +72,7 @@ export function Logo({
   markSize = 30,
   /** Hide the wordmark (collapsed rail). */
   wordmark = true,
-  /** Render the wordmark in white (on the dark sidebar). */
+  /** Render on dark chrome: white wordmark + dark-adapted mark. */
   onDark = false,
 }: {
   className?: string;
@@ -64,7 +82,11 @@ export function Logo({
 }) {
   return (
     <span className={cn("inline-flex items-center gap-2.5", className)}>
-      <LogoMark size={markSize} className="shrink-0" />
+      <LogoMark
+        size={markSize}
+        variant={onDark ? "onDark" : "color"}
+        className="shrink-0"
+      />
       {wordmark ? (
         <span
           className={cn(
@@ -72,7 +94,7 @@ export function Logo({
             onDark ? "text-white" : "text-ink",
           )}
         >
-          JeniMc<span className="serif-accent font-medium text-primary">Rich</span>
+          Jenny Mcrich
         </span>
       ) : null}
     </span>
