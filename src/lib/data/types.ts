@@ -163,6 +163,12 @@ export const DOCUMENT_CATEGORIES = [
   "portfolio",
   "certification",
   "offer_letter",
+  // TN / USMCA compliance paperwork (migration 0013).
+  "tn_support_letter",
+  "credential_evaluation",
+  "i94_record",
+  "passport_copy",
+  "tn_approval",
   "other",
 ] as const;
 export type DocumentCategory = (typeof DOCUMENT_CATEGORIES)[number];
@@ -171,6 +177,11 @@ export const DOCUMENT_CATEGORY_LABELS: Record<DocumentCategory, string> = {
   portfolio: "Portfolio",
   certification: "Certification",
   offer_letter: "Offer Letter",
+  tn_support_letter: "TN Support Letter",
+  credential_evaluation: "Credential Evaluation",
+  i94_record: "I-94 Record",
+  passport_copy: "Passport Copy",
+  tn_approval: "TN Approval",
   other: "Other",
 };
 
@@ -206,6 +217,9 @@ export const ACTIVITY_TYPES = [
   "tag",
   "flag",
   "scorecard",
+  // TN / USMCA compliance events (migration 0013).
+  "compliance",
+  "legal_review",
   "system",
 ] as const;
 export type ActivityType = (typeof ACTIVITY_TYPES)[number];
@@ -437,6 +451,35 @@ export interface StageTime {
   avg_days: number;
 }
 
+/**
+ * Flattened dashboard view-models. The dashboard only renders a few fields, so
+ * it doesn't carry the full `StalledApplication` / `InterviewWithRelations`
+ * graphs (those stay for the calendar / candidate detail). Keeping these light
+ * lets the dashboard be served from bounded SQL aggregates instead of the whole
+ * store — see `dashboard_stats` (migration 0010).
+ */
+export interface DashboardStalled {
+  application_id: string;
+  candidate_id: string;
+  candidate_name: string;
+  candidate_flagged: boolean;
+  job_title: string;
+  client_name: string;
+  stage: Stage;
+  days_stalled: number;
+}
+
+export interface DashboardInterview {
+  id: string;
+  candidate_id: string;
+  candidate_name: string;
+  job_title: string;
+  interview_type: InterviewType;
+  starts_at: string;
+  interviewer_name: string;
+  stage: Stage;
+}
+
 export interface DashboardStats {
   stage_counts: Record<Stage, number>;
   active_candidates: number;
@@ -447,10 +490,35 @@ export interface DashboardStats {
   hired_total: number;
   avg_time_to_hire_days: number;
   stalled_count: number;
-  stalled: StalledApplication[];
-  todays_interviews: InterviewWithRelations[];
-  upcoming_interviews: InterviewWithRelations[];
+  stalled: DashboardStalled[];
+  todays_interviews: DashboardInterview[];
+  upcoming_interviews: DashboardInterview[];
   recent_activity: ActivityFeedItem[];
+}
+
+/**
+ * A pipeline-board card — flattened, with the match score read from the cached
+ * `applications.match_score` so the board never re-scores every application.
+ * Fields mirror the board's `BoardCard`. The board caps columns at a per-stage
+ * limit; `PipelineBoardData.counts` carries the true per-stage totals.
+ */
+export interface PipelineCard {
+  applicationId: string;
+  candidateId: string;
+  jobId: string;
+  candidateName: string;
+  flagged: boolean;
+  jobTitle: string;
+  restrictiveVisa: boolean;
+  score: number;
+  stage: Stage;
+  daysInStage: number;
+  isStalled: boolean;
+}
+
+export interface PipelineBoardData {
+  cards: PipelineCard[];
+  counts: Record<Stage, number>;
 }
 
 export interface AnalyticsData {
@@ -536,6 +604,68 @@ export interface LogEmailInput {
   subject: string;
   status?: EmailStatus;
   actor_name?: string;
+}
+
+/* ----------------------------- TN / USMCA compliance ----------------------------- */
+
+/**
+ * Persisted TN-compliance record for one application (maps to the
+ * `tn_compliance` table, migration 0013). `tn_eligible` is null until the
+ * eligibility screen has been run. `retention_until` is DB-generated and
+ * read-only here.
+ */
+export interface TnComplianceRecord {
+  id: string;
+  application_id: string;
+  job_title_at_check: string | null;
+  tn_eligible: boolean | null;
+  matched_occupation: string | null;
+  eligibility_confidence: "exact" | "keyword" | "none" | null;
+  legal_review_required: boolean;
+  legal_review_cleared_at: string | null;
+  legal_review_cleared_by: string | null;
+  legal_review_notes: string | null;
+  hired_at: string | null;
+  employment_ended_at: string | null;
+  retention_until: string | null;
+  created_at: string;
+  updated_at: string;
+  archived_at: string | null;
+}
+
+/** One TN required-document row, with whether it's on file for the candidate. */
+export interface TnRequiredDoc {
+  /** The `document_category` value this maps to. */
+  category: DocumentCategory;
+  label: string;
+  hint: string;
+  /** True when at least one non-archived document of this category exists. */
+  present: boolean;
+}
+
+/**
+ * The TN checklist view-model for the candidate detail panel: the eligibility
+ * screen result, the document checklist, and the legal-review interlock state.
+ */
+export interface TnChecklistStatus {
+  applicationId: string;
+  jobTitle: string;
+  visa: VisaType;
+  /** Eligibility screen (from lib/tn-eligibility). Null when never run. */
+  eligible: boolean | null;
+  matchedOccupation: string | null;
+  confidence: "exact" | "keyword" | "none" | null;
+  /** True while an attorney must review before the result is relied upon. */
+  legalReviewRequired: boolean;
+  /** ISO instant the legal review was cleared, or null. */
+  legalReviewClearedAt: string | null;
+  legalReviewNotes: string | null;
+  /** Required-document checklist with present/missing flags. */
+  docs: TnRequiredDoc[];
+  /** True when every required document is on file. */
+  allDocsPresent: boolean;
+  /** Persisted record, if one exists yet. */
+  record: TnComplianceRecord | null;
 }
 
 /* ----------------------------- errors ----------------------------- */

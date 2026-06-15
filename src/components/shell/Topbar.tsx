@@ -1,9 +1,33 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import type { ReactNode, RefObject } from "react";
+import type { RefObject } from "react";
+import { Icon } from "@/components/ui";
+import { AnimatedBell } from "./animated-bell";
+import {
+  getNotifications,
+  markAllNotificationsRead,
+  markNotificationsRead,
+  type AppNotification,
+} from "./notifications-actions";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { signOut } from "@/app/(auth)/login/actions";
+import { CommandPalette } from "./CommandPalette";
+import { MobileNav } from "./MobileNav";
+import { Assistant } from "@/components/assistant/Assistant";
+
+// NEXT_PUBLIC_* is inlined at build; off by default → no launcher renders.
+const AI_ON = process.env.NEXT_PUBLIC_AI_ENABLED === "true";
 
 /**
  * Dark topbar: page title (derived from the route, overridable via `title`),
@@ -33,7 +57,7 @@ export function pageTitleFor(pathname: string): string {
     if (pathname === rule.prefix) return rule.section;
     if (pathname.startsWith(`${rule.prefix}/`)) return rule.detail ?? rule.section;
   }
-  return "JeniMcRich";
+  return "Jenny Mcrich";
 }
 
 /* ---------- Small helpers ---------- */
@@ -72,130 +96,140 @@ function useDropdown(): {
   return { open, setOpen, ref };
 }
 
-function TopSvg({ className, children }: { className?: string; children: ReactNode }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.8}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className ?? "h-[18px] w-[18px]"}
-      aria-hidden="true"
-    >
-      {children}
-    </svg>
-  );
-}
-
 const POPOVER_CLASSES =
   "absolute right-0 top-[calc(100%+8px)] z-50 overflow-hidden rounded-xl border border-slate-200 bg-white text-slate-800 shadow-xl";
 
-/* ---------- Notifications (demo content until the data layer lands) ---------- */
-
-type DemoNotification = {
-  id: string;
-  kind: "stalled" | "interview";
-  title: string;
-  detail: string;
-};
-
-const DEMO_NOTIFICATIONS: DemoNotification[] = [
-  {
-    id: "n1",
-    kind: "stalled",
-    title: "Marcus Webb is stalled in Screening",
-    detail: "6 days with no activity — follow up or snooze",
-  },
-  {
-    id: "n2",
-    kind: "stalled",
-    title: "Elena Garcia is stalled in Interview",
-    detail: "8 days with no activity — follow up or snooze",
-  },
-  {
-    id: "n3",
-    kind: "interview",
-    title: "Interview today, 2:00 PM",
-    detail: "David Chen — Plant Manager, Lehigh Cement",
-  },
-];
+/* ---------- Notifications (real data from the data layer) ---------- */
 
 function NotificationsBell() {
   const { open, setOpen, ref } = useDropdown();
-  const [seen, setSeen] = useState(false);
-  const unread = seen ? 0 : DEMO_NOTIFICATIONS.length;
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+
+  // Load real notifications on mount, on open, and every 60s so the bell stays
+  // current without a page reload. Marked-read items are filtered server-side.
+  useEffect(() => {
+    let active = true;
+    const refresh = () => {
+      void getNotifications().then((next) => {
+        if (active) setNotifications(next);
+      });
+    };
+    refresh();
+    const interval = setInterval(refresh, 60_000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, []);
+
+  // Refetch each time the dropdown is opened.
+  useEffect(() => {
+    if (!open) return;
+    void getNotifications().then(setNotifications);
+  }, [open]);
+
+  const unread = notifications.length;
+
+  // Optimistically drop one item, then persist. On failure, refetch to resync.
+  const dismissOne = (id: string) => {
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+    void markNotificationsRead([id]).catch(() => {
+      void getNotifications().then(setNotifications);
+    });
+  };
+
+  const dismissAll = () => {
+    setNotifications([]);
+    void markAllNotificationsRead().catch(() => {
+      void getNotifications().then(setNotifications);
+    });
+  };
 
   return (
     <div ref={ref} className="relative">
-      <button
-        type="button"
-        aria-label={unread > 0 ? `Notifications, ${unread} unread` : "Notifications"}
-        aria-haspopup="true"
-        aria-expanded={open}
-        onClick={() => {
-          setOpen(!open);
-          setSeen(true);
-        }}
-        className="relative grid h-9 w-9 place-items-center rounded-lg border border-white/10 text-slate-300 outline-none transition-colors hover:bg-white/10 hover:text-white focus-visible:ring-2 focus-visible:ring-emerald-400"
-      >
-        <TopSvg>
-          <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
-          <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
-        </TopSvg>
-        {unread > 0 && (
-          <span className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white">
-            {unread}
-          </span>
-        )}
-      </button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            aria-label={unread > 0 ? `Notifications, ${unread} unread` : "Notifications"}
+            aria-haspopup="true"
+            aria-expanded={open}
+            onClick={() => setOpen(!open)}
+            className="relative grid h-9 w-9 place-items-center rounded-lg border border-white/10 text-slate-300 outline-none transition-colors hover:bg-white/10 hover:text-white focus-visible:ring-2 focus-visible:ring-emerald-400"
+          >
+            <AnimatedBell unread={unread} />
+            {unread > 0 && (
+              <span className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white">
+                {unread}
+              </span>
+            )}
+          </button>
+        </TooltipTrigger>
+        <TooltipContent>Notifications</TooltipContent>
+      </Tooltip>
 
       {open && (
         <div className={`${POPOVER_CLASSES} w-80`}>
           <div className="flex items-center justify-between border-b border-slate-100 px-4 py-2.5">
             <span className="text-[13px] font-semibold text-slate-900">Notifications</span>
-            <span className="text-[11px] font-medium text-slate-400">
-              {DEMO_NOTIFICATIONS.length} today
-            </span>
+            {notifications.length > 0 ? (
+              <button
+                type="button"
+                onClick={dismissAll}
+                className="rounded text-[11.5px] font-semibold text-emerald-700 outline-none transition-colors hover:text-emerald-800 focus-visible:ring-2 focus-visible:ring-emerald-400"
+              >
+                Mark all as read
+              </button>
+            ) : (
+              <span className="text-[11px] font-medium text-slate-400">All caught up</span>
+            )}
           </div>
-          <ul className="max-h-80 overflow-y-auto py-1">
-            {DEMO_NOTIFICATIONS.map((notification) => (
-              <li key={notification.id}>
-                <div className="flex gap-2.5 px-4 py-2.5 transition-colors hover:bg-slate-50">
-                  <span
-                    className={`mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg ${
-                      notification.kind === "stalled"
-                        ? "bg-amber-100 text-amber-600"
-                        : "bg-emerald-100 text-emerald-600"
-                    }`}
-                  >
-                    {notification.kind === "stalled" ? (
-                      <TopSvg className="h-4 w-4">
-                        <circle cx="12" cy="12" r="9" />
-                        <path d="M12 7v5l3 3" />
-                      </TopSvg>
-                    ) : (
-                      <TopSvg className="h-4 w-4">
-                        <rect x="3" y="4" width="18" height="17" rx="2" />
-                        <path d="M16 2v4" />
-                        <path d="M8 2v4" />
-                        <path d="M3 10h18" />
-                      </TopSvg>
-                    )}
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block truncate text-[13px] font-medium text-slate-800">
-                      {notification.title}
+          {notifications.length === 0 ? (
+            <div className="flex flex-col items-center gap-1.5 px-4 py-8 text-center">
+              <span className="grid h-9 w-9 place-items-center rounded-full bg-emerald-100 text-emerald-600">
+                <Icon name="success" size={18} />
+              </span>
+              <span className="text-[13px] font-semibold text-slate-800">You&rsquo;re all caught up</span>
+              <span className="text-[12px] text-slate-500">
+                No stalled candidates or interviews today
+              </span>
+            </div>
+          ) : (
+            <ul className="max-h-80 overflow-y-auto py-1">
+              {notifications.map((notification) => (
+                <li key={notification.id}>
+                  <div className="group flex items-start gap-2.5 px-4 py-2.5 transition-colors hover:bg-slate-50">
+                    <span
+                      className={`mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg ${
+                        notification.kind === "stalled"
+                          ? "bg-amber-100 text-amber-600"
+                          : "bg-emerald-100 text-emerald-600"
+                      }`}
+                    >
+                      <Icon name={notification.kind === "stalled" ? "stalled" : "interview"} size={16} />
                     </span>
-                    <span className="block truncate text-[12px] text-slate-500">
-                      {notification.detail}
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[13px] font-medium text-slate-800">
+                        {notification.title}
+                      </span>
+                      <span className="block truncate text-[12px] text-slate-500">
+                        {notification.detail}
+                      </span>
                     </span>
-                  </span>
-                </div>
-              </li>
-            ))}
-          </ul>
+                    <button
+                      type="button"
+                      onClick={() => dismissOne(notification.id)}
+                      aria-label="Mark as read"
+                      title="Mark as read"
+                      className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-md text-slate-400 opacity-0 outline-none transition-all hover:bg-slate-200 hover:text-slate-600 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-emerald-400 group-hover:opacity-100"
+                    >
+                      <Icon name="close" size={14} />
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
           <Link
             href="/dashboard"
             onClick={() => setOpen(false)}
@@ -213,89 +247,63 @@ function NotificationsBell() {
 
 const DEMO_USER = {
   name: "Jenny M",
-  email: "jenny@jenimcrich.com",
+  email: "jennyalipin06@gmail.com",
   role: "Admin",
 } as const;
 
 function UserMenu() {
-  const { open, setOpen, ref } = useDropdown();
-
   return (
-    <div ref={ref} className="relative">
-      <button
-        type="button"
-        aria-label={`User menu — ${DEMO_USER.name}, ${DEMO_USER.role}`}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        onClick={() => setOpen(!open)}
-        className="flex h-9 items-center gap-2 rounded-lg px-1 outline-none transition-colors hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-emerald-400 lg:pr-2"
-      >
-        <span className="grid h-7 w-7 place-items-center rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 text-[11px] font-bold text-white">
-          JM
-        </span>
-        <span className="hidden text-left lg:block">
-          <span className="block text-[12.5px] font-semibold leading-tight text-white">
-            {DEMO_USER.name}
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          aria-label={`User menu — ${DEMO_USER.name}, ${DEMO_USER.role}`}
+          className="flex h-9 items-center gap-2 rounded-lg px-1 outline-none transition-colors hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-emerald-400 lg:pr-2"
+        >
+          <span className="grid h-7 w-7 place-items-center rounded-full bg-emerald-600 text-[11px] font-bold text-white">
+            JM
           </span>
-          <span className="block text-[10.5px] leading-tight text-slate-400">
-            {DEMO_USER.role}
+          <span className="hidden text-left lg:block">
+            <span className="block text-[12.5px] font-semibold leading-tight text-white">
+              {DEMO_USER.name}
+            </span>
+            <span className="block text-[10.5px] leading-tight text-slate-400">
+              {DEMO_USER.role}
+            </span>
           </span>
-        </span>
-        <TopSvg className="hidden h-3.5 w-3.5 text-slate-400 lg:block">
-          <path d="m6 9 6 6 6-6" />
-        </TopSvg>
-      </button>
-
-      {open && (
-        <div className={`${POPOVER_CLASSES} w-60`} role="menu">
-          <div className="border-b border-slate-100 px-4 py-3">
-            <div className="flex items-center justify-between gap-2">
-              <span className="truncate text-[13.5px] font-semibold text-slate-900">
-                {DEMO_USER.name}
-              </span>
-              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide text-emerald-700">
-                {DEMO_USER.role}
-              </span>
-            </div>
-            <span className="block truncate text-[12px] text-slate-500">{DEMO_USER.email}</span>
-          </div>
-          <div className="py-1">
-            <Link
-              href="/settings"
-              role="menuitem"
-              onClick={() => setOpen(false)}
-              className="flex items-center gap-2.5 px-4 py-2 text-[13px] font-medium text-slate-700 outline-none transition-colors hover:bg-slate-50 focus-visible:bg-slate-50"
-            >
-              <TopSvg className="h-4 w-4 text-slate-400">
-                <line x1="21" x2="14" y1="5" y2="5" />
-                <line x1="10" x2="3" y1="5" y2="5" />
-                <line x1="21" x2="12" y1="12" y2="12" />
-                <line x1="8" x2="3" y1="12" y2="12" />
-                <line x1="21" x2="16" y1="19" y2="19" />
-                <line x1="12" x2="3" y1="19" y2="19" />
-                <line x1="14" x2="14" y1="3" y2="7" />
-                <line x1="8" x2="8" y1="10" y2="14" />
-                <line x1="16" x2="16" y1="17" y2="21" />
-              </TopSvg>
-              Settings
-            </Link>
-            <Link
-              href="/login"
-              role="menuitem"
-              onClick={() => setOpen(false)}
-              className="flex items-center gap-2.5 px-4 py-2 text-[13px] font-medium text-red-600 outline-none transition-colors hover:bg-red-50 focus-visible:bg-red-50"
-            >
-              <TopSvg className="h-4 w-4">
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                <polyline points="16 17 21 12 16 7" />
-                <line x1="21" x2="9" y1="12" y2="12" />
-              </TopSvg>
-              Sign out
-            </Link>
-          </div>
-        </div>
-      )}
-    </div>
+          <Icon name="chevronDown" size={14} className="hidden text-slate-400 lg:block" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-60">
+        <DropdownMenuLabel className="flex flex-col gap-0.5">
+          <span className="flex items-center justify-between gap-2">
+            <span className="truncate font-semibold text-slate-900">{DEMO_USER.name}</span>
+            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10.5px] font-bold text-emerald-700">
+              {DEMO_USER.role}
+            </span>
+          </span>
+          <span className="truncate text-[12px] font-normal text-slate-500">
+            {DEMO_USER.email}
+          </span>
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem asChild>
+          <Link href="/settings" className="cursor-pointer">
+            <Icon name="settings" size={15} className="text-slate-500" />
+            Settings
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          variant="destructive"
+          onSelect={() => {
+            void signOut();
+          }}
+        >
+          <Icon name="logout" size={15} />
+          Sign out
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -304,10 +312,9 @@ function UserMenu() {
 export function Topbar({ title }: { title?: string }) {
   const pathname = usePathname() ?? "";
   const pageTitle = title ?? pageTitleFor(pathname);
-  const router = useRouter();
-  const searchRef = useRef<HTMLInputElement>(null);
+  const [paletteOpen, setPaletteOpen] = useState(false);
 
-  // ⌘K / Ctrl-K focuses the search (and "/" when not already typing).
+  // ⌘K / Ctrl-K (and "/" when not already typing) toggles the command palette.
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
       const k = event.key.toLowerCase();
@@ -316,51 +323,38 @@ export function Topbar({ title }: { title?: string }) {
         ["input", "textarea", "select"].includes(document.activeElement.tagName.toLowerCase());
       if (((event.metaKey || event.ctrlKey) && k === "k") || (k === "/" && !inField)) {
         event.preventDefault();
-        searchRef.current?.focus();
+        setPaletteOpen((prev) => !prev);
       }
     }
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, []);
 
-  function onSearch(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const q = new FormData(event.currentTarget).get("q");
-    const query = typeof q === "string" ? q.trim() : "";
-    router.push(query ? `/candidates?q=${encodeURIComponent(query)}` : "/candidates");
-  }
-
   return (
     <header className="relative z-40 flex h-16 shrink-0 items-center gap-3 border-b border-slate-800 bg-[#0f172a] px-4 lg:px-6">
+      <MobileNav />
       <h1 className="min-w-0 flex-1 truncate text-[17px] font-semibold tracking-tight text-white">
         {pageTitle}
       </h1>
 
-      {/* Global search → candidate search (the working query surface). */}
-      <form role="search" onSubmit={onSearch} className="relative hidden w-64 md:block xl:w-80">
-        <TopSvg className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400">
-          <circle cx="11" cy="11" r="8" />
-          <path d="m21 21-4.35-4.35" />
-        </TopSvg>
-        <input
-          ref={searchRef}
-          name="q"
-          type="search"
-          enterKeyHint="search"
-          aria-label="Search candidates by name, skill or résumé keyword"
-          placeholder="Search candidates…"
-          className="h-9 w-full rounded-lg border border-white/10 bg-white/5 pl-9 pr-11 text-[13px] text-slate-100 outline-none transition-colors placeholder:text-slate-400 focus:border-emerald-500/60 focus:bg-white/10 focus:ring-2 focus:ring-emerald-500/30"
-        />
-        <kbd
-          aria-hidden="true"
-          className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 rounded border border-white/10 px-1.5 py-0.5 font-mono text-[10px] text-slate-400"
-        >
+      {/* Global search → opens the ⌘K command palette */}
+      <button
+        type="button"
+        onClick={() => setPaletteOpen(true)}
+        aria-label="Search and navigate (⌘K)"
+        className="hidden h-9 w-64 items-center gap-2 rounded-lg border border-white/10 bg-white/5 pl-3 pr-2 text-[13px] text-slate-400 transition-colors hover:bg-white/10 hover:text-slate-300 md:flex xl:w-80"
+      >
+        <Icon name="search" size={16} className="shrink-0 text-slate-400" />
+        <span className="flex-1 text-left">Search…</span>
+        <kbd className="rounded border border-white/10 px-1.5 py-0.5 font-mono text-[10px] text-slate-400">
           ⌘K
         </kbd>
-      </form>
+      </button>
 
+      {AI_ON ? <Assistant /> : null}
       <NotificationsBell />
       <UserMenu />
+      <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
     </header>
   );
 }

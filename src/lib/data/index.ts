@@ -27,20 +27,26 @@ import { daysBetween, formatFullDateTime } from "@/lib/format";
 import { getSupabaseServerClient, type SupabaseServerClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { createDemoStore, REFERENCE_NOW, type DemoStore } from "./demo-data";
-import { loadStore } from "./supabase-store";
+import { loadStore, loadCandidatesPageData, loadClients, loadJobsView } from "./supabase-store";
 import {
   sbAddNote,
   sbAddScorecard,
   sbCancelInterview,
+  sbClearLegalReview,
+  sbGetCandidateDocCategories,
+  sbGetTnCompliance,
   sbIsSlotTaken,
   sbLogEmail,
   sbMoveStage,
   sbScheduleInterview,
   sbUpdateSettings,
+  sbUpsertTnCompliance,
 } from "./supabase-mutations";
+import { isTnEligible, TN_REQUIRED_DOCS } from "@/lib/tn-eligibility";
 import {
   ACTIVE_STAGES,
   DataLayerError,
+  isRestrictiveVisa,
   PIPELINE_STAGES,
   SOURCES,
   STAGES,
@@ -60,6 +66,8 @@ import {
   type CandidateWithApplications,
   type Client,
   type DashboardStats,
+  type DashboardStalled,
+  type DashboardInterview,
   type EmailLogEntry,
   type EmailTemplate,
   type FunnelStep,
@@ -72,6 +80,8 @@ import {
   type JobWithStats,
   type LogEmailInput,
   type Note,
+  type PipelineBoardData,
+  type PipelineCard,
   type ScheduleInterviewInput,
   type Scorecard,
   type Settings,
@@ -79,7 +89,12 @@ import {
   type Stage,
   type StageTime,
   type StalledApplication,
+  type TnChecklistStatus,
+  type TnComplianceRecord,
+  type TnRequiredDoc,
+  type VisaType,
 } from "./types";
+import { matchScore } from "@/lib/scoring";
 import type { ScoreCandidateInput, ScoreJobInput } from "@/lib/types";
 
 // Re-export the full client-safe type/enum surface plus the reference instant
@@ -281,11 +296,18 @@ function jobStats(s: DemoStore, jobId: string): Pick<JobWithStats, "applicant_co
 
 const JOB_STATUS_ORDER: Record<Job["status"], number> = { open: 0, on_hold: 1, closed: 2 };
 
-/** Jobs with applicant stats. Sorted open → on hold → closed, newest first. */
-export async function getJobs(filters?: JobFilters): Promise<JobWithStats[]> {
-  const s = await getStore();
+function emptyStageCounts(): Record<Stage, number> {
+  return Object.fromEntries(STAGES.map((st) => [st, 0])) as Record<Stage, number>;
+}
+
+/** Apply the list filters + canonical sort, attaching each job's stats. */
+function assembleJobs(
+  jobs: Job[],
+  filters: JobFilters | undefined,
+  statsFor: (jobId: string) => Pick<JobWithStats, "applicant_count" | "stage_counts">,
+): JobWithStats[] {
   const q = filters?.q?.trim().toLowerCase();
-  return s.jobs
+  return jobs
     .filter((j) => j.archived_at === null)
     .filter((j) => (filters?.status ? j.status === filters.status : true))
     .filter((j) => (filters?.client_id ? j.client_id === filters.client_id : true))
@@ -302,7 +324,35 @@ export async function getJobs(filters?: JobFilters): Promise<JobWithStats[]> {
       (a, b) =>
         JOB_STATUS_ORDER[a.status] - JOB_STATUS_ORDER[b.status] || byIsoDesc(a.opened_at, b.opened_at),
     )
-    .map((j) => ({ ...clone(j), ...jobStats(s, j.id) }));
+    .map((j) => ({ ...clone(j), ...statsFor(j.id) }));
+}
+
+/**
+ * Jobs with applicant stats. Sorted open → on hold → closed, newest first.
+ * Uses a bounded read (jobs + skills + clients + applications) so the listing —
+ * and every post-save re-render of it — never hydrates the whole database;
+ * falls back to the full store snapshot (demo data, or if the read errors).
+ */
+export async function getJobs(filters?: JobFilters): Promise<JobWithStats[]> {
+  const supabase = await getSupabaseServerClient();
+  if (supabase) {
+    try {
+      const view = await loadJobsView(supabase);
+      const stats = new Map<string, { applicant_count: number; stage_counts: Record<Stage, number> }>();
+      for (const app of view.applications) {
+        if (view.archivedCandidateIds.has(app.candidate_id)) continue; // exclude archived candidates' apps
+        const entry = stats.get(app.job_id) ?? { applicant_count: 0, stage_counts: emptyStageCounts() };
+        entry.applicant_count += 1;
+        entry.stage_counts[app.stage] += 1;
+        stats.set(app.job_id, entry);
+      }
+      return assembleJobs(view.jobs, filters, (id) => stats.get(id) ?? { applicant_count: 0, stage_counts: emptyStageCounts() });
+    } catch {
+      // Bounded read failed — fall through to the full store snapshot.
+    }
+  }
+  const s = await getStore();
+  return assembleJobs(s.jobs, filters, (id) => jobStats(s, id));
 }
 
 export async function getJob(id: string): Promise<JobWithStats | null> {
@@ -312,6 +362,14 @@ export async function getJob(id: string): Promise<JobWithStats | null> {
 }
 
 export async function getClients(): Promise<Client[]> {
+  const supabase = await getSupabaseServerClient();
+  if (supabase) {
+    try {
+      return await loadClients(supabase);
+    } catch {
+      // fall through to the full store snapshot
+    }
+  }
   return clone((await getStore()).clients);
 }
 
@@ -363,6 +421,130 @@ export async function getCandidates(filters?: CandidateFilters): Promise<Candida
     .map((c) => ({ ...clone(c), applications: candidateApplications(s, c.id) }));
 }
 
+export interface CandidatesPageResult {
+  rows: CandidateWithApplications[];
+  total: number;
+}
+
+/**
+ * Scalable, server-paginated candidate list. On live Supabase it filters +
+ * counts in SQL (search_candidates_page RPC) and loads ONLY the page's rows —
+ * so it stays cheap at 15k+ candidates, unlike getCandidates() which hydrates
+ * the whole store. Falls back to in-memory filter+slice on the demo store.
+ */
+export async function getCandidatesPage(
+  filters: CandidateFilters,
+  page: number,
+  pageSize: number,
+): Promise<CandidatesPageResult> {
+  const offset = Math.max(0, (page - 1) * pageSize);
+  const supabase = await getSupabaseServerClient();
+
+  if (!supabase) {
+    const all = await getCandidates(filters);
+    return { rows: all.slice(offset, offset + pageSize), total: all.length };
+  }
+
+  // search_candidates_page isn't in the generated Database types yet (it lives
+  // only in migration 0007), so call it through a narrowly-typed view of the
+  // client. NOTE: retype the whole client (not just `.rpc`) and call
+  // `sb.rpc(...)` so the method keeps its `this` binding to the client.
+  const sb = supabase as unknown as {
+    rpc(
+      name: "search_candidates_page",
+      args: {
+        p_q: string | null;
+        p_flagged: boolean;
+        p_sources: string[] | null;
+        p_tags: string[] | null;
+        p_stages: string[] | null;
+        p_job_ids: string[] | null;
+        p_include_archived: boolean;
+        p_limit: number;
+        p_offset: number;
+      },
+    ): Promise<{
+      data: { id: string; total: number | string }[] | null;
+      error: { message: string } | null;
+    }>;
+  };
+
+  try {
+    const { data, error } = await sb.rpc("search_candidates_page", {
+      p_q: filters.q?.trim() || null,
+      p_flagged: filters.flagged_only ?? false,
+      // domain Source is display-cased ("Job Portal"); the DB enum is snake_case.
+      p_sources: filters.sources?.length
+        ? filters.sources.map((s) => s.toLowerCase().replace(/ /g, "_"))
+        : null,
+      p_tags: filters.tags?.length ? filters.tags : null,
+      p_stages: filters.stages?.length ? filters.stages : null,
+      p_job_ids: filters.job_ids?.length ? filters.job_ids : null,
+      p_include_archived: filters.include_archived ?? false,
+      p_limit: pageSize,
+      p_offset: offset,
+    });
+    if (error) throw new Error(error.message);
+    if (!data || data.length === 0) return { rows: [], total: 0 };
+
+    const total = Number(data[0].total);
+    const rows = await loadCandidatesPageData(
+      supabase,
+      data.map((m) => m.id),
+    );
+    return { rows, total };
+  } catch (err) {
+    // Never break the list: fall back to the in-memory filter+slice path.
+    // Log only the error *name*, never `.message` — a failed query can echo
+    // the search term (which may be a candidate email/phone) in its detail.
+    console.error("getCandidatesPage scalable path failed; using in-memory fallback:", err instanceof Error ? err.name : "UnknownError");
+    const all = await getCandidates(filters);
+    return { rows: all.slice(offset, offset + pageSize), total: all.length };
+  }
+}
+
+/** Distinct tags across all candidates — for the filter sidebar. */
+export async function getCandidateTags(): Promise<string[]> {
+  const supabase = await getSupabaseServerClient();
+  if (!supabase) {
+    const s = await getStore();
+    return [...new Set(s.candidates.flatMap((c) => c.tags))].sort();
+  }
+  const { data } = await supabase.from("candidate_tags").select("tag");
+  if (!data) return [];
+  return [...new Set(data.map((r) => r.tag))].sort();
+}
+
+/** First-seen casing wins; comparison is case-insensitive. */
+function dedupeNamesCI(names: string[]): string[] {
+  const seen = new Map<string, string>();
+  for (const n of names) {
+    const key = n.toLowerCase();
+    if (!seen.has(key)) seen.set(key, n);
+  }
+  return [...seen.values()];
+}
+
+/**
+ * Distinct candidate skill names — feeds the Jobs page's JD-parser
+ * autocomplete dictionary via a single-column query instead of hydrating
+ * every candidate (and their applications, notes, …) just for a word list.
+ */
+export async function getCandidateSkillNames(): Promise<string[]> {
+  const supabase = await getSupabaseServerClient();
+  if (supabase) {
+    try {
+      const { data, error } = await supabase.from("candidate_skills").select("skill");
+      if (error) throw error;
+      return dedupeNamesCI((data ?? []).map((r) => r.skill));
+    } catch {
+      // fall through to the full store snapshot
+    }
+  }
+  const s = await getStore();
+  return dedupeNamesCI(s.candidates.flatMap((c) => c.skills.map((sk) => sk.skill)));
+}
+
 /** Full profile for the candidate detail page (all tabs in one call). */
 export async function getCandidate(id: string): Promise<CandidateProfile | null> {
   const s = await getStore();
@@ -403,6 +585,115 @@ export async function getApplicationsByStage(): Promise<Record<Stage, Applicatio
     result[stage].sort((a, b) => byIsoAsc(a.stage_entered_at, b.stage_entered_at));
   }
   return result;
+}
+
+/** Raw `pipeline_board` RPC payload (migration 0011). */
+interface PipelineBoardRpc {
+  counts: Partial<Record<Stage, number>>;
+  cards: Array<{
+    application_id: string;
+    candidate_id: string;
+    candidate_name: string;
+    candidate_flagged: boolean;
+    job_id: string;
+    job_title: string;
+    visa: string;
+    score: number;
+    stage: Stage;
+    days_in_stage: number;
+    is_stalled: boolean;
+  }>;
+}
+
+async function pipelineBoardFromRpc(
+  supabase: SupabaseServerClient,
+  limitPerStage: number,
+): Promise<PipelineBoardData> {
+  const { data: settingsRow } = await supabase
+    .from("settings")
+    .select("stalled_enabled, stalled_days")
+    .maybeSingle();
+  const stalledEnabled = settingsRow?.stalled_enabled ?? true;
+  const stalledDays = settingsRow?.stalled_days ?? 5;
+
+  const sb = supabase as unknown as {
+    rpc(
+      name: "pipeline_board",
+      args: { p_stalled_enabled: boolean; p_stalled_days: number; p_limit_per_stage: number },
+    ): Promise<{ data: PipelineBoardRpc | null; error: { message: string } | null }>;
+  };
+  const { data, error } = await sb.rpc("pipeline_board", {
+    p_stalled_enabled: stalledEnabled,
+    p_stalled_days: stalledDays,
+    p_limit_per_stage: limitPerStage,
+  });
+  if (error || !data) throw error ?? new Error("pipeline_board returned no data");
+
+  const counts = Object.fromEntries(STAGES.map((st) => [st, data.counts[st] ?? 0])) as Record<
+    Stage,
+    number
+  >;
+  const cards: PipelineCard[] = data.cards.map((c) => ({
+    applicationId: c.application_id,
+    candidateId: c.candidate_id,
+    jobId: c.job_id,
+    candidateName: c.candidate_name,
+    flagged: c.candidate_flagged,
+    jobTitle: c.job_title,
+    restrictiveVisa: isRestrictiveVisa(c.visa as VisaType),
+    score: c.score,
+    stage: c.stage,
+    daysInStage: c.days_in_stage,
+    isStalled: c.is_stalled,
+  }));
+  return { cards, counts };
+}
+
+/**
+ * Pipeline board, capped to `limitPerStage` cards per column (with the true
+ * per-stage counts) using cached match scores — so the board never loads or
+ * re-scores every application. Falls back to the in-memory store.
+ */
+export async function getPipelineBoard(limitPerStage = 100): Promise<PipelineBoardData> {
+  const supabase = await getSupabaseServerClient();
+  if (supabase) {
+    try {
+      return await pipelineBoardFromRpc(supabase, limitPerStage);
+    } catch {
+      // fall through to the in-memory board below
+    }
+  }
+
+  const s = await getStore();
+  const counts = Object.fromEntries(STAGES.map((st) => [st, 0])) as Record<Stage, number>;
+  const grouped: Record<Stage, ApplicationWithRelations[]> = {
+    applied: [], screening: [], interview: [], offer: [], hired: [], rejected: [],
+  };
+  for (const app of liveApplications(s)) {
+    counts[app.stage] += 1;
+    grouped[app.stage].push(withRelations(s, app));
+  }
+
+  const cards: PipelineCard[] = [];
+  for (const stage of STAGES) {
+    grouped[stage].sort((a, b) => byIsoAsc(a.stage_entered_at, b.stage_entered_at));
+    for (const wr of grouped[stage].slice(0, limitPerStage)) {
+      cards.push({
+        applicationId: wr.id,
+        candidateId: wr.candidate_id,
+        jobId: wr.job_id,
+        candidateName: wr.candidate.full_name,
+        flagged: wr.candidate.flagged,
+        jobTitle: wr.job.title,
+        restrictiveVisa: isRestrictiveVisa(wr.job.visa),
+        score: matchScore(toScoreCandidate(wr.candidate), toScoreJob(wr.job)).score,
+        stage,
+        daysInStage: wr.days_in_stage,
+        isStalled: wr.is_stalled,
+      });
+    }
+  }
+  return { cards, counts };
 }
 
 export async function getApplicationsForJob(jobId: string): Promise<ApplicationWithRelations[]> {
@@ -757,7 +1048,164 @@ function avgDaysToHire(s: DemoStore): number {
   return Math.round(total / hired.length);
 }
 
+/** Aggregate payload from the `dashboard_stats` RPC (migration 0010). */
+interface DashboardRpc {
+  stage_counts: Partial<Record<Stage, number>>;
+  active_candidates: number;
+  flagged_candidates: number;
+  open_jobs: number;
+  open_clients: number;
+  hired_total: number;
+  avg_time_to_hire_days: number;
+  stalled_count: number;
+  stalled: DashboardStalled[];
+}
+
+// DB interview_type enum → domain InterviewType (mirrors supabase-store).
+const DASH_INTERVIEW_TYPE: Record<string, DashboardInterview["interview_type"]> = {
+  hr_interview: "hr_interview",
+  technical: "technical",
+  final_panel: "final_panel",
+  client_interview: "client_interview",
+  phone_screen: "hr_interview",
+  panel: "final_panel",
+  other: "hr_interview",
+};
+
+/**
+ * Today's + the next five scheduled interviews. The interviews table has no
+ * candidate/interviewer-name columns (candidate is via the application,
+ * interviewer via profiles), so we resolve those with bounded id-keyed lookups
+ * rather than deep PostgREST embeds.
+ */
+async function dashboardInterviews(
+  supabase: SupabaseServerClient,
+  todayStartMs: number,
+): Promise<{ todays: DashboardInterview[]; upcoming: DashboardInterview[] }> {
+  const { data: ivData, error } = await supabase
+    .from("interviews")
+    .select("id, application_id, interviewer_id, type, starts_at")
+    .eq("status", "scheduled")
+    .is("archived_at", null)
+    .gte("starts_at", new Date(todayStartMs).toISOString())
+    .order("starts_at", { ascending: true })
+    .limit(50);
+  if (error) throw error;
+  const ivs = ivData ?? [];
+  if (ivs.length === 0) return { todays: [], upcoming: [] };
+
+  const applicationIds = [...new Set(ivs.map((i) => i.application_id))];
+  const interviewerIds = [...new Set(ivs.map((i) => i.interviewer_id).filter((id): id is string => Boolean(id)))];
+  const { data: appData } = await supabase
+    .from("applications")
+    .select("id, candidate_id, stage, job_id")
+    .in("id", applicationIds);
+  const apps = appData ?? [];
+
+  const candidateIds = [...new Set(apps.map((a) => a.candidate_id))];
+  const jobIds = [...new Set(apps.map((a) => a.job_id))];
+  const [candRes, jobRes, profRes] = await Promise.all([
+    candidateIds.length > 0
+      ? supabase.from("candidates").select("id, full_name").in("id", candidateIds)
+      : Promise.resolve({ data: [] as { id: string; full_name: string }[] }),
+    jobIds.length > 0
+      ? supabase.from("jobs").select("id, title").in("id", jobIds)
+      : Promise.resolve({ data: [] as { id: string; title: string }[] }),
+    interviewerIds.length > 0
+      ? supabase.from("profiles").select("id, full_name").in("id", interviewerIds)
+      : Promise.resolve({ data: [] as { id: string; full_name: string }[] }),
+  ]);
+  const candidateName = new Map((candRes.data ?? []).map((c) => [c.id, c.full_name]));
+  const jobTitle = new Map((jobRes.data ?? []).map((j) => [j.id, j.title]));
+  const interviewerName = new Map((profRes.data ?? []).map((p) => [p.id, p.full_name]));
+  const appInfo = new Map(
+    apps.map((a) => [a.id, { candidate_id: a.candidate_id, stage: a.stage as Stage, job_id: a.job_id }]),
+  );
+
+  const all: DashboardInterview[] = ivs.map((i) => {
+    const app = appInfo.get(i.application_id);
+    const candidateId = app?.candidate_id ?? "";
+    return {
+      id: i.id,
+      candidate_id: candidateId,
+      candidate_name: candidateName.get(candidateId) ?? "Unknown candidate",
+      job_title: (app && jobTitle.get(app.job_id)) || "—",
+      interview_type: DASH_INTERVIEW_TYPE[i.type] ?? "hr_interview",
+      starts_at: i.starts_at,
+      interviewer_name: (i.interviewer_id && interviewerName.get(i.interviewer_id)) || "Interviewer",
+      stage: app?.stage ?? "applied",
+    };
+  });
+
+  const nowMs = readNowMs();
+  const todays = all.filter((r) => {
+    const t = Date.parse(r.starts_at);
+    return t >= todayStartMs && t < todayStartMs + DAY_MS;
+  });
+  const upcoming = all.filter((r) => Date.parse(r.starts_at) >= nowMs).slice(0, 5);
+  return { todays, upcoming };
+}
+
+/** Scalable dashboard: aggregates from the RPC, interviews + activity bounded. */
+async function dashboardFromRpc(supabase: SupabaseServerClient): Promise<DashboardStats> {
+  const { data: settingsRow } = await supabase
+    .from("settings")
+    .select("stalled_enabled, stalled_days")
+    .maybeSingle();
+  const stalledEnabled = settingsRow?.stalled_enabled ?? true;
+  const stalledDays = settingsRow?.stalled_days ?? 5;
+  const todayStart = startOfUtcDayMs(readNowMs());
+
+  const sb = supabase as unknown as {
+    rpc(
+      name: "dashboard_stats",
+      args: { p_stalled_enabled: boolean; p_stalled_days: number; p_stalled_limit: number },
+    ): Promise<{ data: DashboardRpc | null; error: { message: string } | null }>;
+  };
+
+  const [statsRes, interviews, recent_activity] = await Promise.all([
+    sb.rpc("dashboard_stats", {
+      p_stalled_enabled: stalledEnabled,
+      p_stalled_days: stalledDays,
+      p_stalled_limit: 12,
+    }),
+    dashboardInterviews(supabase, todayStart),
+    getActivityFeed(8),
+  ]);
+
+  const { data, error } = statsRes;
+  if (error || !data) throw error ?? new Error("dashboard_stats returned no data");
+
+  const stage_counts = Object.fromEntries(
+    STAGES.map((st) => [st, data.stage_counts[st] ?? 0]),
+  ) as Record<Stage, number>;
+
+  return {
+    stage_counts,
+    active_candidates: data.active_candidates,
+    flagged_candidates: data.flagged_candidates,
+    open_jobs: data.open_jobs,
+    open_clients: data.open_clients,
+    hired_total: data.hired_total,
+    avg_time_to_hire_days: data.avg_time_to_hire_days,
+    stalled_count: data.stalled_count,
+    stalled: data.stalled,
+    todays_interviews: interviews.todays,
+    upcoming_interviews: interviews.upcoming,
+    recent_activity,
+  };
+}
+
 export async function getDashboardStats(): Promise<DashboardStats> {
+  const supabase = await getSupabaseServerClient();
+  if (supabase) {
+    try {
+      return await dashboardFromRpc(supabase);
+    } catch {
+      // RPC unavailable/failed — fall back to the in-memory path below.
+    }
+  }
+
   const s = await getStore();
   const apps = liveApplications(s);
 
@@ -769,7 +1217,28 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   );
   const openJobs = s.jobs.filter((j) => j.archived_at === null && j.status === "open");
 
-  const stalled = await getStalledApplications();
+  const stalledFull = await getStalledApplications();
+  const stalled: DashboardStalled[] = stalledFull.slice(0, 12).map((a) => ({
+    application_id: a.id,
+    candidate_id: a.candidate_id,
+    candidate_name: a.candidate.full_name,
+    candidate_flagged: a.candidate.flagged,
+    job_title: a.job.title,
+    client_name: a.job.client_name,
+    stage: a.stage,
+    days_stalled: a.days_stalled,
+  }));
+
+  const toDash = (iv: InterviewWithRelations): DashboardInterview => ({
+    id: iv.id,
+    candidate_id: iv.candidate_id,
+    candidate_name: iv.candidate.full_name,
+    job_title: iv.job.title,
+    interview_type: iv.interview_type,
+    starts_at: iv.starts_at,
+    interviewer_name: iv.interviewer_name,
+    stage: iv.application.stage,
+  });
 
   const scheduled = s.interviews
     .filter((iv) => iv.status === "scheduled" && Date.parse(iv.starts_at) >= readNowMs())
@@ -788,15 +1257,124 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     open_clients: new Set(openJobs.map((j) => j.client_id)).size,
     hired_total: stage_counts.hired,
     avg_time_to_hire_days: avgDaysToHire(s),
-    stalled_count: stalled.length,
+    stalled_count: stalledFull.length,
     stalled,
-    todays_interviews: todays.map((iv) => interviewWithRelations(s, iv)),
-    upcoming_interviews: scheduled.slice(0, 5).map((iv) => interviewWithRelations(s, iv)),
+    todays_interviews: todays.map((iv) => toDash(interviewWithRelations(s, iv))),
+    upcoming_interviews: scheduled.slice(0, 5).map((iv) => toDash(interviewWithRelations(s, iv))),
     recent_activity: await getActivityFeed(8),
   };
 }
 
+/** Raw payload from the `analytics_summary` RPC (migration 0009). */
+interface AnalyticsRpc {
+  total_candidates: number;
+  stage_counts: Partial<Record<Stage, number>>;
+  avg_time_to_hire_days: number;
+  time_in_stage: Partial<Record<Stage, number>>;
+  source_breakdown: { source: string; total: number; qualified: number }[];
+  activity_counts: {
+    emails_sent: number;
+    notes_logged: number;
+    scorecards_submitted: number;
+    interviews_scheduled: number;
+    stalled_now: number;
+  };
+}
+
+/**
+ * Scalable analytics: Postgres aggregates everything (migration 0009) so we
+ * never hydrate the whole store. The funnel and conversion percentages are
+ * derived in JS from the per-stage counts to keep the rule (rejected apps count
+ * toward "Applied" only) next to its sibling logic in the demo path.
+ */
+async function analyticsFromRpc(supabase: SupabaseServerClient): Promise<AnalyticsData> {
+  const { data: settingsRow } = await supabase
+    .from("settings")
+    .select("stalled_enabled, stalled_days")
+    .maybeSingle();
+  const stalledEnabled = settingsRow?.stalled_enabled ?? true;
+  const stalledDays = settingsRow?.stalled_days ?? 5;
+
+  const sb = supabase as unknown as {
+    rpc(
+      name: "analytics_summary",
+      args: { p_stalled_enabled: boolean; p_stalled_days: number },
+    ): Promise<{ data: AnalyticsRpc | null; error: { message: string } | null }>;
+  };
+  const { data, error } = await sb.rpc("analytics_summary", {
+    p_stalled_enabled: stalledEnabled,
+    p_stalled_days: stalledDays,
+  });
+  if (error || !data) throw error ?? new Error("analytics_summary returned no data");
+
+  const sc = data.stage_counts;
+  const countOf = (st: Stage): number => sc[st] ?? 0;
+  // reached(stage) = apps at that stage or further; rejected counts only at Applied.
+  const reached: Record<(typeof PIPELINE_STAGES)[number], number> = {
+    applied:
+      countOf("applied") +
+      countOf("screening") +
+      countOf("interview") +
+      countOf("offer") +
+      countOf("hired") +
+      countOf("rejected"),
+    screening: countOf("screening") + countOf("interview") + countOf("offer") + countOf("hired"),
+    interview: countOf("interview") + countOf("offer") + countOf("hired"),
+    offer: countOf("offer") + countOf("hired"),
+    hired: countOf("hired"),
+  };
+  const funnel: FunnelStep[] = PIPELINE_STAGES.map((stage, i) => {
+    const count = reached[stage];
+    const prev = i === 0 ? count : reached[PIPELINE_STAGES[i - 1]];
+    return {
+      stage,
+      label: STAGE_LABELS[stage],
+      count,
+      conversion_pct: i === 0 ? 100 : prev > 0 ? Math.round((count / prev) * 100) : 0,
+    };
+  });
+
+  const offers_extended = countOf("offer") + countOf("hired");
+  const offers_accepted = countOf("hired");
+
+  const time_in_stage: StageTime[] = ACTIVE_STAGES.map((stage) => ({
+    stage,
+    label: STAGE_LABELS[stage],
+    avg_days: data.time_in_stage[stage] ?? 0,
+  }));
+
+  // Match each display source to its snake_case DB enum value (same transform
+  // as the candidate filters).
+  const byDbSource = new Map(data.source_breakdown.map((row) => [row.source, row]));
+  const source_breakdown: SourceStat[] = SOURCES.map((source) => {
+    const row = byDbSource.get(source.toLowerCase().replace(/ /g, "_"));
+    return { source, total: row?.total ?? 0, qualified: row?.qualified ?? 0 };
+  });
+
+  return {
+    total_candidates: data.total_candidates,
+    funnel,
+    avg_time_to_hire_days: data.avg_time_to_hire_days,
+    offers_extended,
+    offers_accepted,
+    offer_acceptance_pct: offers_extended ? Math.round((offers_accepted / offers_extended) * 100) : 0,
+    interview_to_offer_pct: reached.interview ? Math.round((reached.offer / reached.interview) * 100) : 0,
+    time_in_stage,
+    source_breakdown,
+    activity_counts: { ...data.activity_counts },
+  };
+}
+
 export async function getAnalytics(): Promise<AnalyticsData> {
+  const supabase = await getSupabaseServerClient();
+  if (supabase) {
+    try {
+      return await analyticsFromRpc(supabase);
+    } catch {
+      // RPC unavailable/failed — fall back to the in-memory aggregation below.
+    }
+  }
+
   const s = await getStore();
   const apps = liveApplications(s);
 
@@ -869,7 +1447,53 @@ export async function getAnalytics(): Promise<AnalyticsData> {
 /* Activity feed & settings                                            */
 /* ------------------------------------------------------------------ */
 
+/** The recent activity feed from only the latest N rows + their names. */
+async function activityFeedFromSupabase(
+  supabase: SupabaseServerClient,
+  limit: number,
+): Promise<ActivityFeedItem[]> {
+  const { data, error } = await supabase
+    .from("activity_log")
+    .select("id, candidate_id, actor_id, type, body, created_at, updated_at")
+    .order("created_at", { ascending: false })
+    .limit(Math.max(0, limit));
+  if (error) throw error;
+  const rows = data ?? [];
+  if (rows.length === 0) return [];
+
+  const candidateIds = [...new Set(rows.map((r) => r.candidate_id))];
+  const actorIds = [...new Set(rows.map((r) => r.actor_id).filter((id): id is string => Boolean(id)))];
+  const [candRes, actorRes] = await Promise.all([
+    supabase.from("candidates").select("id, full_name").in("id", candidateIds),
+    actorIds.length > 0
+      ? supabase.from("profiles").select("id, full_name").in("id", actorIds)
+      : Promise.resolve({ data: [] as { id: string; full_name: string }[] }),
+  ]);
+  const candidateName = new Map((candRes.data ?? []).map((c) => [c.id, c.full_name]));
+  const actorName = new Map((actorRes.data ?? []).map((p) => [p.id, p.full_name]));
+
+  return rows.map((r) => ({
+    id: r.id,
+    candidate_id: r.candidate_id,
+    type: r.type,
+    body: r.body,
+    created_at: r.created_at,
+    updated_at: r.updated_at,
+    actor_name: (r.actor_id && actorName.get(r.actor_id)) || "System",
+    candidate_name: candidateName.get(r.candidate_id) ?? "Unknown candidate",
+  }));
+}
+
 export async function getActivityFeed(limit = 20): Promise<ActivityFeedItem[]> {
+  const supabase = await getSupabaseServerClient();
+  if (supabase) {
+    try {
+      return await activityFeedFromSupabase(supabase, limit);
+    } catch {
+      // fall through to the in-memory feed below
+    }
+  }
+
   const s = await getStore();
   const names = new Map(s.candidates.map((c) => [c.id, c.full_name]));
   return clone(
@@ -900,6 +1524,262 @@ export async function updateSettings(patch: Partial<Settings>): Promise<Settings
   if (patch.stalled_days !== undefined) s.settings.stalled_days = patch.stalled_days;
   if (patch.stalled_enabled !== undefined) s.settings.stalled_enabled = patch.stalled_enabled;
   return clone(s.settings);
+}
+
+/* ------------------------------------------------------------------ */
+/* TN / USMCA compliance (migration 0013)                              */
+/* ------------------------------------------------------------------ */
+
+const TN_VISAS: readonly VisaType[] = ["TN_CANADIAN_ONLY", "TN_CANADIAN_OR_MEXICAN"];
+
+/** Build the required-document checklist given the categories on file. */
+function buildTnDocs(presentCategories: readonly string[]): TnRequiredDoc[] {
+  const present = new Set(presentCategories);
+  return TN_REQUIRED_DOCS.map((d) => ({
+    category: d.category as TnRequiredDoc["category"],
+    label: d.label,
+    hint: d.hint,
+    present: present.has(d.category),
+  }));
+}
+
+/**
+ * Compose a {@link TnChecklistStatus} from a job title, visa, the persisted
+ * record (if any), and the candidate's document categories. The eligibility
+ * read prefers the persisted screen; if none exists it computes a live screen
+ * from the job title so the panel always has something to show. ALL results
+ * remain attorney-gated (lib/tn-eligibility's interlock).
+ */
+function composeTnChecklist(args: {
+  applicationId: string;
+  jobTitle: string;
+  visa: VisaType;
+  record: TnComplianceRecord | null;
+  docCategories: readonly string[];
+}): TnChecklistStatus {
+  const { applicationId, jobTitle, visa, record, docCategories } = args;
+  const docs = buildTnDocs(docCategories);
+  const allDocsPresent = docs.every((d) => d.present);
+
+  if (record && record.tn_eligible !== null) {
+    return {
+      applicationId,
+      jobTitle,
+      visa,
+      eligible: record.tn_eligible,
+      matchedOccupation: record.matched_occupation,
+      confidence: record.eligibility_confidence,
+      legalReviewRequired: record.legal_review_required,
+      legalReviewClearedAt: record.legal_review_cleared_at,
+      legalReviewNotes: record.legal_review_notes,
+      docs,
+      allDocsPresent,
+      record,
+    };
+  }
+
+  // No persisted screen yet — this is the zero-state. We do NOT surface a
+  // computed verdict here (eligible:null → the panel shows "Not screened" and a
+  // "Run eligibility check" button); running the check persists a result and the
+  // branch above then renders it. legalReviewRequired stays true regardless.
+  return {
+    applicationId,
+    jobTitle,
+    visa,
+    eligible: null,
+    matchedOccupation: null,
+    confidence: null,
+    legalReviewRequired: true,
+    legalReviewClearedAt: record?.legal_review_cleared_at ?? null,
+    legalReviewNotes: record?.legal_review_notes ?? null,
+    docs,
+    allDocsPresent,
+    record,
+  };
+}
+
+/**
+ * The TN checklist view-model for an application: eligibility screen + document
+ * checklist + legal-review interlock. The Supabase path is wrapped so it never
+ * throws if migration 0013 isn't applied yet — it degrades to the live
+ * (computed, unsaved) screen with whatever documents are visible. The demo
+ * store has no persisted record, so it returns a computed stub (all docs
+ * missing) derived from the application's job title.
+ */
+export async function getTnChecklist(applicationId: string): Promise<TnChecklistStatus | null> {
+  const supabase = await getSupabaseServerClient();
+  if (supabase) {
+    try {
+      const s = await freshStore(supabase);
+      const app = s.applications.find((a) => a.id === applicationId);
+      if (!app) return null;
+      const job = s.jobs.find((j) => j.id === app.job_id);
+      if (!job) return null;
+
+      // These two reads touch tn_compliance / documents; if 0013 isn't applied
+      // the tn_compliance read throws and we fall through to the demo path.
+      const [record, docCategories] = await Promise.all([
+        sbGetTnCompliance(supabase, applicationId),
+        sbGetCandidateDocCategories(supabase, app.candidate_id),
+      ]);
+      return composeTnChecklist({
+        applicationId,
+        jobTitle: job.title,
+        visa: job.visa,
+        record,
+        docCategories,
+      });
+    } catch {
+      // 0013 not applied (or a transient read failure): degrade to a safe,
+      // computed stub from the in-memory store rather than throwing.
+    }
+  }
+
+  const s = await getStore();
+  const app = s.applications.find((a) => a.id === applicationId);
+  if (!app) return null;
+  const job = s.jobs.find((j) => j.id === app.job_id);
+  if (!job) return null;
+  const docCategories = s.documents
+    .filter((d) => d.candidate_id === app.candidate_id)
+    .map((d) => d.category as string);
+  return composeTnChecklist({
+    applicationId,
+    jobTitle: job.title,
+    visa: job.visa,
+    record: null,
+    docCategories,
+  });
+}
+
+/** The persisted TN-compliance record for an application, or null. */
+export async function getTnComplianceRecord(
+  applicationId: string,
+): Promise<TnComplianceRecord | null> {
+  const supabase = await getSupabaseServerClient();
+  if (supabase) {
+    try {
+      return await sbGetTnCompliance(supabase, applicationId);
+    } catch {
+      // 0013 not applied yet — there is no record.
+    }
+  }
+  return null;
+}
+
+/**
+ * Run (and persist) the TN eligibility screen for an application from its
+ * current job title. On the demo store there is no persistence layer, so it
+ * returns the freshly-computed, unsaved checklist. NOT legal advice — every
+ * result stays attorney-gated.
+ */
+export async function runTnEligibilityCheck(applicationId: string): Promise<TnChecklistStatus> {
+  const supabase = await getSupabaseServerClient();
+  if (supabase) {
+    const pre = await freshStore(supabase);
+    const app = pre.applications.find((a) => a.id === applicationId);
+    if (!app) throw new DataLayerError("NOT_FOUND", "That application could not be found.");
+    const job = pre.jobs.find((j) => j.id === app.job_id);
+    if (!job) throw new DataLayerError("NOT_FOUND", "That job could not be found.");
+
+    const screen = isTnEligible(job.title);
+    const record = await sbUpsertTnCompliance(supabase, {
+      application_id: applicationId,
+      job_title_at_check: job.title,
+      tn_eligible: screen.eligible,
+      matched_occupation: screen.matchedOccupation,
+      eligibility_confidence: screen.confidence,
+      legal_review_required: screen.legalReviewRequired,
+    });
+    const docCategories = await sbGetCandidateDocCategories(supabase, app.candidate_id);
+    return composeTnChecklist({
+      applicationId,
+      jobTitle: job.title,
+      visa: job.visa,
+      record,
+      docCategories,
+    });
+  }
+
+  // Demo store: compute on the fly (no persistence), log a compliance activity.
+  const s = db();
+  const app = applicationOrThrow(s, applicationId);
+  const job = jobOrThrow(s, app.job_id);
+  const screen = isTnEligible(job.title);
+  appendActivity(
+    s,
+    app.candidate_id,
+    "compliance",
+    `TN eligibility screened: ${screen.eligible ? "may qualify" : "does not qualify"}` +
+      `${screen.matchedOccupation ? ` (${screen.matchedOccupation})` : ""} — pending legal review`,
+    "Jenny M.",
+  );
+  // Build inline from the store we just mutated — avoid re-entering
+  // getTnChecklist()/getStore() (cache()-wrapped) after a write.
+  const docCategories = s.documents
+    .filter((d) => d.candidate_id === app.candidate_id)
+    .map((d) => d.category as string);
+  return composeTnChecklist({
+    applicationId,
+    jobTitle: job.title,
+    visa: job.visa,
+    record: null,
+    docCategories,
+  });
+}
+
+/**
+ * Clear the legal-review interlock on an application's TN screen. Admin-only —
+ * the server action re-checks the role; the Supabase RLS update policy is the
+ * real gate. On the demo store (no persistence) this logs the sign-off only.
+ */
+export async function clearTnLegalReview(
+  applicationId: string,
+  notes: string,
+): Promise<TnChecklistStatus> {
+  const supabase = await getSupabaseServerClient();
+  if (supabase) {
+    const record = await sbClearLegalReview(supabase, applicationId, notes);
+    const pre = await freshStore(supabase);
+    const app = pre.applications.find((a) => a.id === applicationId);
+    const job = app ? pre.jobs.find((j) => j.id === app.job_id) : undefined;
+    const docCategories = app
+      ? await sbGetCandidateDocCategories(supabase, app.candidate_id)
+      : [];
+    return composeTnChecklist({
+      applicationId,
+      jobTitle: job?.title ?? record.job_title_at_check ?? "",
+      visa: (job?.visa ?? "UNSPECIFIED") as VisaType,
+      record,
+      docCategories,
+    });
+  }
+
+  const s = db();
+  const app = applicationOrThrow(s, applicationId);
+  appendActivity(
+    s,
+    app.candidate_id,
+    "legal_review",
+    `Legal review cleared by immigration attorney${notes.trim() ? ` — ${notes.trim()}` : ""}`,
+    "Jenny M.",
+  );
+  const job = s.jobs.find((j) => j.id === app.job_id);
+  const docCategories = s.documents
+    .filter((d) => d.candidate_id === app.candidate_id)
+    .map((d) => d.category as string);
+  return composeTnChecklist({
+    applicationId,
+    jobTitle: job?.title ?? "",
+    visa: (job?.visa ?? "UNSPECIFIED") as VisaType,
+    record: null,
+    docCategories,
+  });
+}
+
+/** True when an application's job carries a TN visa requirement. */
+export function isTnVisa(visa: VisaType): boolean {
+  return TN_VISAS.includes(visa);
 }
 
 /* ------------------------------------------------------------------ */

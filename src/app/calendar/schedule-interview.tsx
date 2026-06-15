@@ -165,7 +165,8 @@ export function ScheduleInterviewButton({
 
           {applications.length === 0 ? (
             <p className="mb-4 rounded-control border border-slate-200 bg-slate-50 px-3 py-2 text-[13px] text-slate-500">
-              No active applications to book against — add candidates to a job first.
+              No candidates in an active stage yet. Add a candidate to a job, then
+              come back to schedule an interview.
             </p>
           ) : null}
 

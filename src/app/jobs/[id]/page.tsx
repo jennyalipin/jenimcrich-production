@@ -21,6 +21,7 @@ import {
   getApplicationsForJob,
   getJob,
   isRestrictiveVisa,
+  isTnVisa,
   toScoreCandidate,
   toScoreJob,
   type ApplicationWithRelations,
@@ -28,6 +29,7 @@ import {
 } from "@/lib/data";
 import { formatDate, formatDateTime, daysSince } from "@/lib/format";
 import { matchScore } from "@/lib/scoring";
+import { isTnEligible } from "@/lib/tn-eligibility";
 import { getJobNotes, getLocalJob } from "../_lib/job-store";
 import { AddJobNoteForm } from "./add-note-form";
 import { ApplicantsTable, type ApplicantRow } from "./applicants-table";
@@ -64,6 +66,27 @@ function WeightDots({ weight }: { weight: 1 | 2 | 3 }) {
         />
       ))}
     </span>
+  );
+}
+
+/**
+ * Short TN/USMCA eligibility note for TN roles. Screens the job title against
+ * the USMCA professional occupations. NOT legal advice — always carries the
+ * attorney-review caveat (the screen's legal-review interlock is pending).
+ */
+function TnEligibilityNote({ title }: { title: string }) {
+  const screen = isTnEligible(title);
+  return (
+    <div className="mt-2 rounded-control border border-warning-soft bg-warning-soft/30 px-3 py-2">
+      <p className="text-xs leading-relaxed text-warning-ink">
+        <span className="font-semibold">TN eligibility (provisional): </span>
+        {screen.eligible
+          ? `This title plausibly maps to the USMCA profession “${screen.matchedOccupation}”.`
+          : "This title does not clearly map to a USMCA professional occupation."}{" "}
+        Not reviewed by a licensed immigration attorney — do not present to clients or candidates.
+        Run the full check from the candidate&apos;s Documents tab.
+      </p>
+    </div>
   );
 }
 
@@ -131,9 +154,10 @@ export default async function JobDetailPage({
     <div className="p-6">
       <Link
         href="/jobs"
-        className="text-[13px] font-semibold text-primary hover:text-primary-strong hover:underline"
+        className="inline-flex items-center gap-1 text-[13px] font-semibold text-primary hover:text-primary-strong hover:underline"
       >
-        ← Back to jobs
+        <Icon name="chevronRight" size={15} className="rotate-180" />
+        Back to jobs
       </Link>
 
       {/* Overview */}
@@ -170,6 +194,8 @@ export default async function JobDetailPage({
             <p className="mt-3 text-xs text-slate-400">Work authorization: not specified</p>
           )}
 
+          {isTnVisa(job.visa) ? <TnEligibilityNote title={job.title} /> : null}
+
           {job.description ? (
             <p className="mt-3 text-[13px] leading-relaxed text-slate-600">{job.description}</p>
           ) : null}
@@ -191,7 +217,7 @@ export default async function JobDetailPage({
       </Card>
 
       {/* KPIs */}
-      <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mt-4 grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           label="Total applicants"
           value={total}

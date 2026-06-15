@@ -24,7 +24,9 @@ import {
   Info,
   Inbox,
   LayoutDashboard,
+  LogOut,
   Mail,
+  Menu,
   Magnet,
   Paperclip,
   Plus,
@@ -74,6 +76,8 @@ const ICONS = {
   archive: Archive,
   verified: BadgeCheck,
   bell: Bell,
+  logout: LogOut,
+  menu: Menu,
   // generic ui
   search: Search,
   close: X,

@@ -30,8 +30,10 @@ import type {
   ActivityLogEntry,
   ActivityType,
   Application,
+  ApplicationWithJob,
   Candidate,
   CandidateSkill,
+  CandidateWithApplications,
   Client,
   DocumentRecord,
   EmailLogEntry,
@@ -53,6 +55,7 @@ import type {
   TemplateCategory,
   VisaType,
 } from "./types";
+import { ACTIVE_STAGES } from "./types";
 
 const STALLED_VALUES: readonly StalledDays[] = [3, 5, 7, 10];
 
@@ -110,6 +113,86 @@ function unwrap<T>(label: string, res: { data: T | null; error: { message: strin
   return (res.data ?? []) as T;
 }
 
+/* ---- Row → domain mappers (shared by loadStore and the bounded views) ---- */
+
+type ClientRow = {
+  id: string;
+  name: string;
+  contact_name: string | null;
+  contact_email: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+function mapClientRow(c: ClientRow): Client {
+  return {
+    id: c.id,
+    name: c.name,
+    contact_name: str(c.contact_name),
+    contact_email: str(c.contact_email),
+    notes: c.notes,
+    created_at: c.created_at,
+    updated_at: c.updated_at,
+  };
+}
+
+function groupJobSkills(rows: { job_id: string; skill: string; weight: number }[]): Map<string, JobSkill[]> {
+  const byJob = new Map<string, JobSkill[]>();
+  for (const js of rows) {
+    const list = byJob.get(js.job_id) ?? [];
+    list.push({ skill: js.skill, weight: weight1to3(js.weight) });
+    byJob.set(js.job_id, list);
+  }
+  return byJob;
+}
+
+type JobRow = {
+  id: string;
+  client_id: string;
+  title: string;
+  location: string | null;
+  salary_range: string | null;
+  min_years: number;
+  description: string | null;
+  requirements: string[] | null;
+  status: Job["status"];
+  visa: string;
+  visa_notes: string | null;
+  jd_text: string | null;
+  opened_at: string;
+  archived_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+function mapJobRow(
+  j: JobRow,
+  clientNameById: Map<string, string>,
+  skillsByJob: Map<string, JobSkill[]>,
+): Job {
+  return {
+    id: j.id,
+    client_id: j.client_id,
+    client_name: clientNameById.get(j.client_id) ?? "",
+    title: j.title,
+    location: str(j.location),
+    salary_range: str(j.salary_range),
+    min_years: j.min_years,
+    description: str(j.description),
+    requirements: j.requirements ?? [],
+    status: j.status,
+    visa: j.visa as VisaType,
+    visa_notes: j.visa_notes,
+    jd_text: str(j.jd_text),
+    skills: skillsByJob.get(j.id) ?? [],
+    opened_at: j.opened_at,
+    archived_at: j.archived_at,
+    created_at: j.created_at,
+    updated_at: j.updated_at,
+  };
+}
+
 /**
  * Read every table (RLS-scoped) and assemble a `DemoStore` snapshot. Called
  * once per request by the data layer when Supabase is configured — never
@@ -163,45 +246,12 @@ export async function loadStore(supabase: SupabaseServerClient): Promise<DemoSto
     .map((p) => ({ id: p.id, name: p.full_name, role: ROLE_LABELS[p.role] ?? p.role }));
 
   // ---- Clients ----
-  const clients: Client[] = unwrap("clients", clientsRes).map((c) => ({
-    id: c.id,
-    name: c.name,
-    contact_name: str(c.contact_name),
-    contact_email: str(c.contact_email),
-    notes: c.notes,
-    created_at: c.created_at,
-    updated_at: c.updated_at,
-  }));
+  const clients: Client[] = unwrap("clients", clientsRes).map(mapClientRow);
   const clientNameById = new Map(clients.map((c) => [c.id, c.name]));
 
   // ---- Jobs (+ skills) ----
-  const jobSkills = unwrap("job skills", jobSkillsRes);
-  const skillsByJob = new Map<string, JobSkill[]>();
-  for (const js of jobSkills) {
-    const list = skillsByJob.get(js.job_id) ?? [];
-    list.push({ skill: js.skill, weight: weight1to3(js.weight) });
-    skillsByJob.set(js.job_id, list);
-  }
-  const jobs: Job[] = unwrap("jobs", jobsRes).map((j) => ({
-    id: j.id,
-    client_id: j.client_id,
-    client_name: clientNameById.get(j.client_id) ?? "",
-    title: j.title,
-    location: str(j.location),
-    salary_range: str(j.salary_range),
-    min_years: j.min_years,
-    description: str(j.description),
-    requirements: j.requirements ?? [],
-    status: j.status,
-    visa: j.visa as VisaType,
-    visa_notes: j.visa_notes,
-    jd_text: str(j.jd_text),
-    skills: skillsByJob.get(j.id) ?? [],
-    opened_at: j.opened_at,
-    archived_at: j.archived_at,
-    created_at: j.created_at,
-    updated_at: j.updated_at,
-  }));
+  const skillsByJob = groupJobSkills(unwrap("job skills", jobSkillsRes));
+  const jobs: Job[] = unwrap("jobs", jobsRes).map((j) => mapJobRow(j, clientNameById, skillsByJob));
 
   // ---- Candidates (+ skills / certs / tags) ----
   const candSkills = unwrap("candidate skills", candSkillsRes);
@@ -371,4 +421,223 @@ export async function loadStore(supabase: SupabaseServerClient): Promise<DemoSto
     settings,
     seq: 0,
   };
+}
+
+const PAGE_DAY_MS = 86_400_000;
+
+/**
+ * Scalable candidate-page loader: fetches ONLY the given candidate ids (one
+ * page) plus their related rows, and returns fully-formed
+ * CandidateWithApplications in `ids` order. Unlike loadStore() this never
+ * hydrates the whole table, so it stays cheap at 15k+ candidates. Computes
+ * days_in_stage / is_stalled with the same formulas as the in-memory layer
+ * (domain rule 3), using the real clock (live Supabase path).
+ */
+export async function loadCandidatesPageData(
+  supabase: SupabaseServerClient,
+  ids: string[],
+): Promise<CandidateWithApplications[]> {
+  if (ids.length === 0) return [];
+
+  const [candR, skR, certR, tagR, appR, noteR, emailR, setR] = await Promise.all([
+    supabase.from("candidates").select("*").in("id", ids),
+    supabase.from("candidate_skills").select("candidate_id, skill, years").in("candidate_id", ids),
+    supabase.from("candidate_certifications").select("candidate_id, name").in("candidate_id", ids),
+    supabase.from("candidate_tags").select("candidate_id, tag").in("candidate_id", ids),
+    supabase.from("applications").select("*").in("candidate_id", ids),
+    supabase.from("notes").select("candidate_id, created_at").in("candidate_id", ids).is("archived_at", null),
+    supabase.from("email_log").select("candidate_id, created_at").in("candidate_id", ids),
+    supabase.from("settings").select("stalled_days, stalled_enabled").limit(1).maybeSingle(),
+  ]);
+
+  // Empty `.in([])` is invalid in PostgREST; use a never-matching sentinel id so
+  // every query is typed identically whether or not the page has applications.
+  const NO_ID = "00000000-0000-0000-0000-000000000000";
+  const appRows = appR.data ?? [];
+  const jobIds = [...new Set(appRows.map((a) => a.job_id))];
+  const [jobR, jobSkillR] = await Promise.all([
+    supabase.from("jobs").select("*").in("id", jobIds.length ? jobIds : [NO_ID]),
+    supabase.from("job_skills").select("job_id, skill, weight").in("job_id", jobIds.length ? jobIds : [NO_ID]),
+  ]);
+  const jobRows = jobR.data ?? [];
+  const clientIds = [...new Set(jobRows.map((j) => j.client_id))];
+  const cliR = await supabase
+    .from("clients")
+    .select("id, name")
+    .in("id", clientIds.length ? clientIds : [NO_ID]);
+  const clientName = new Map((cliR.data ?? []).map((c) => [c.id, c.name]));
+
+  // ---- group child rows by parent id ----
+  const skillsByCand = new Map<string, CandidateSkill[]>();
+  for (const r of skR.data ?? []) {
+    const list = skillsByCand.get(r.candidate_id) ?? [];
+    list.push({ skill: r.skill, years: r.years });
+    skillsByCand.set(r.candidate_id, list);
+  }
+  const certsByCand = new Map<string, string[]>();
+  for (const r of certR.data ?? []) {
+    const list = certsByCand.get(r.candidate_id) ?? [];
+    list.push(r.name);
+    certsByCand.set(r.candidate_id, list);
+  }
+  const tagsByCand = new Map<string, string[]>();
+  for (const r of tagR.data ?? []) {
+    const list = tagsByCand.get(r.candidate_id) ?? [];
+    list.push(r.tag);
+    tagsByCand.set(r.candidate_id, list);
+  }
+  const skillsByJob = new Map<string, JobSkill[]>();
+  for (const r of jobSkillR.data ?? []) {
+    const list = skillsByJob.get(r.job_id) ?? [];
+    list.push({ skill: r.skill, weight: weight1to3(r.weight) });
+    skillsByJob.set(r.job_id, list);
+  }
+
+  const jobById = new Map<string, Job>();
+  for (const j of jobRows) {
+    jobById.set(j.id, {
+      id: j.id,
+      client_id: j.client_id,
+      client_name: clientName.get(j.client_id) ?? "",
+      title: j.title,
+      location: str(j.location),
+      salary_range: str(j.salary_range),
+      min_years: j.min_years,
+      description: str(j.description),
+      requirements: j.requirements ?? [],
+      status: j.status,
+      visa: j.visa as VisaType,
+      visa_notes: j.visa_notes,
+      jd_text: str(j.jd_text),
+      skills: skillsByJob.get(j.id) ?? [],
+      opened_at: j.opened_at,
+      archived_at: j.archived_at,
+      created_at: j.created_at,
+      updated_at: j.updated_at,
+    });
+  }
+
+  // ---- stalled inputs (last note / email per candidate) ----
+  const lastNote = new Map<string, number>();
+  for (const n of noteR.data ?? []) {
+    lastNote.set(n.candidate_id, Math.max(lastNote.get(n.candidate_id) ?? 0, Date.parse(n.created_at)));
+  }
+  const lastEmail = new Map<string, number>();
+  for (const e of emailR.data ?? []) {
+    lastEmail.set(e.candidate_id, Math.max(lastEmail.get(e.candidate_id) ?? 0, Date.parse(e.created_at)));
+  }
+  const stalledDays = setR.data?.stalled_days ?? 5;
+  const stalledEnabled = setR.data?.stalled_enabled ?? true;
+  const now = Date.now();
+
+  const candById = new Map(
+    (candR.data ?? []).map((c) => [
+      c.id,
+      {
+        id: c.id,
+        full_name: c.full_name,
+        email: str(c.email),
+        phone: str(c.phone),
+        location: str(c.location),
+        source: toSource(c.source),
+        years_exp: c.years_exp,
+        summary: str(c.summary),
+        expected_salary: str(c.expected_salary),
+        notice_period: str(c.notice_period),
+        resume_text: str(c.resume_text),
+        flagged: c.flagged,
+        skills: skillsByCand.get(c.id) ?? [],
+        certifications: certsByCand.get(c.id) ?? [],
+        tags: tagsByCand.get(c.id) ?? [],
+        archived_at: c.archived_at,
+        created_at: c.created_at,
+        updated_at: c.updated_at,
+      } satisfies Candidate,
+    ]),
+  );
+
+  const appsByCand = new Map<string, typeof appRows>();
+  for (const a of appRows) {
+    const list = appsByCand.get(a.candidate_id) ?? [];
+    list.push(a);
+    appsByCand.set(a.candidate_id, list);
+  }
+
+  return ids
+    .map((id) => candById.get(id))
+    .filter((c): c is Candidate => c !== undefined)
+    .map((c) => {
+      const apps = (appsByCand.get(c.id) ?? [])
+        .slice()
+        .sort((a, b) => (a.applied_at < b.applied_at ? 1 : -1))
+        .map((a): ApplicationWithJob => {
+          const enteredMs = Date.parse(a.stage_entered_at);
+          const lastTouch = Math.max(enteredMs, lastNote.get(c.id) ?? 0, lastEmail.get(c.id) ?? 0);
+          const daysStalled = Math.max(0, Math.floor((now - lastTouch) / PAGE_DAY_MS));
+          const stage = a.stage as Stage;
+          return {
+            id: a.id,
+            candidate_id: a.candidate_id,
+            job_id: a.job_id,
+            stage,
+            stage_entered_at: a.stage_entered_at,
+            applied_at: a.applied_at,
+            created_at: a.created_at,
+            updated_at: a.updated_at,
+            job: jobById.get(a.job_id)!,
+            days_in_stage: Math.max(0, Math.floor((now - enteredMs) / PAGE_DAY_MS)),
+            is_stalled:
+              stalledEnabled &&
+              c.archived_at === null &&
+              (ACTIVE_STAGES as readonly Stage[]).includes(stage) &&
+              daysStalled >= stalledDays,
+          };
+        })
+        .filter((a) => a.job !== undefined);
+      return { ...c, applications: apps };
+    });
+}
+
+/** Just the client directory (New-Job form, client matching) — one small table. */
+export async function loadClients(supabase: SupabaseServerClient): Promise<Client[]> {
+  return unwrap("clients", await supabase.from("clients").select("*")).map(mapClientRow);
+}
+
+/**
+ * Bounded read backing the Jobs list + New-Job form. Loads only the tables
+ * that page needs — jobs, their skills, client names, and the application
+ * rows required for per-stage stats — instead of the full 17-table
+ * `loadStore` hydration. Saving a job and re-rendering the list therefore
+ * never drags the candidate, notes, interview or activity tables.
+ */
+export async function loadJobsView(supabase: SupabaseServerClient): Promise<{
+  jobs: Job[];
+  clients: Client[];
+  applications: { job_id: string; candidate_id: string; stage: Stage }[];
+  archivedCandidateIds: Set<string>;
+}> {
+  const [clientsRes, jobsRes, jobSkillsRes, appsRes, candsRes] = await Promise.all([
+    supabase.from("clients").select("*"),
+    supabase.from("jobs").select("*").is("archived_at", null),
+    supabase.from("job_skills").select("job_id, skill, weight"),
+    supabase.from("applications").select("job_id, candidate_id, stage"),
+    supabase.from("candidates").select("id, archived_at"),
+  ]);
+
+  const clients = unwrap("clients", clientsRes).map(mapClientRow);
+  const clientNameById = new Map(clients.map((c) => [c.id, c.name]));
+  const skillsByJob = groupJobSkills(unwrap("job skills", jobSkillsRes));
+  const jobs = unwrap("jobs", jobsRes).map((j) => mapJobRow(j, clientNameById, skillsByJob));
+  const applications = unwrap("applications", appsRes).map((a) => ({
+    job_id: a.job_id,
+    candidate_id: a.candidate_id,
+    stage: a.stage as Stage,
+  }));
+  const archivedCandidateIds = new Set(
+    unwrap("candidates", candsRes)
+      .filter((c) => c.archived_at !== null)
+      .map((c) => c.id),
+  );
+
+  return { jobs, clients, applications, archivedCandidateIds };
 }

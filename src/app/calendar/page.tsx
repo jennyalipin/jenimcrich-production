@@ -36,7 +36,7 @@ const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
  *  the Interview stage hue; emerald = final panel; blue = HR; amber = client). */
 const typeChipClass: Record<InterviewType, string> = {
   hr_interview: "bg-info-soft text-info-ink",
-  technical: "bg-accent-soft text-accent-ink",
+  technical: "bg-interview-soft text-interview-ink",
   final_panel: "bg-primary-soft text-primary-ink",
   client_interview: "bg-warning-soft text-warning-ink",
 };
@@ -221,7 +221,7 @@ export default async function CalendarPage({
               <div
                 key={cell.dateKey}
                 className={cn(
-                  "min-h-24 border-b border-r border-slate-200 p-1.5 [&:nth-child(7n)]:border-r-0 [&:nth-last-child(-n+7)]:border-b-0",
+                  "min-h-28 border-b border-r border-slate-200 p-1.5 [&:nth-child(7n)]:border-r-0 [&:nth-last-child(-n+7)]:border-b-0",
                   cell.inMonth ? "bg-surface" : "bg-slate-50",
                 )}
               >
@@ -243,7 +243,7 @@ export default async function CalendarPage({
                     href={`/candidates/${event.candidate_id}`}
                     title={`${event.candidate.full_name} — ${INTERVIEW_TYPE_LABELS[event.interview_type]} with ${event.interviewer_name}`}
                     className={cn(
-                      "mt-1 block truncate rounded-[5px] px-1.5 py-0.5 text-[10.5px] font-semibold leading-4 hover:opacity-80",
+                      "mt-1 block truncate rounded-control px-1.5 py-0.5 text-[11px] font-semibold leading-tight hover:opacity-80",
                       typeChipClass[event.interview_type],
                     )}
                   >
@@ -259,11 +259,13 @@ export default async function CalendarPage({
       {/* This week */}
       <Card className="mt-4">
         <CardHeader>
-          <CardTitle>This week</CardTitle>
-          <span className="text-xs text-slate-500">
-            Pulled live from candidate records · {formatDayLabel(weekStartMs)} –{" "}
-            {formatDayLabel(weekEndMs - DAY_MS)}
-          </span>
+          <div>
+            <CardTitle>This week</CardTitle>
+            <span className="mt-0.5 block text-[12px] text-slate-500">
+              {formatDayLabel(weekStartMs)} – {formatDayLabel(weekEndMs - DAY_MS)}
+            </span>
+          </div>
+          <span className="text-xs text-slate-400">Pulled live from candidate records</span>
         </CardHeader>
         {weekInterviews.length > 0 ? (
           <ul>

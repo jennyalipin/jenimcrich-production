@@ -35,7 +35,11 @@ import {
 import { matchScore, rankJobs } from "@/lib/scoring";
 import type { ScoreCandidateInput } from "@/lib/types";
 import { MatchCard } from "./match-card";
+import { analyzeResumeAction } from "./ai-actions";
 import { parseResumeText, type ParsedResume } from "./resume-parser";
+
+/** NEXT_PUBLIC_* is inlined at build time, so this is safe in a client component. */
+const AI_ON = process.env.NEXT_PUBLIC_AI_ENABLED === "true";
 
 /* ------------------------------------------------------------------ */
 /* Props (plain, serializable — built by the Server Component page)    */
@@ -149,13 +153,15 @@ function CandidateToJobs({ jobs, candidates, skillDictionary }: MatchmakerClient
     setSubject(candidate ? { kind: "existing", candidate } : null);
   }
 
-  function handleAnalyze() {
+  async function handleAnalyze() {
     const text = resumeText.trim();
     if (text.length < 40) {
       setParseError("Paste at least a few lines of resume text so there is something to analyze.");
       return;
     }
-    const parsed = parseResumeText(text, skillDictionary);
+    const parsed = AI_ON
+      ? await analyzeResumeAction({ text, skillDictionary: [...skillDictionary] })
+      : parseResumeText(text, skillDictionary);
     if (parsed.skills.length === 0 && parsed.yearsExp === 0) {
       setParseError(
         "No recognizable skills or experience found in that text. Paste the resume body — skills, years of experience and certifications.",
@@ -271,7 +277,7 @@ function CandidateToJobs({ jobs, candidates, skillDictionary }: MatchmakerClient
                   Analyze resume
                 </Button>
                 <p className="text-[11.5px] text-slate-400">
-                  Heuristic extraction — PDF parsing arrives with Supabase.
+                  Paste resume text to extract skills and rank matches.
                 </p>
               </div>
             </div>
@@ -417,15 +423,14 @@ function SubjectSummary({ subject }: { subject: Subject }) {
           <div className="mt-2.5 flex flex-wrap gap-1.5">
             {skills.map((skill) => (
               <Badge key={skill.skill} variant="info">
-                {skill.skill} · {skill.years}y
+                {skill.skill} <span className="text-slate-400">{skill.years}y</span>
               </Badge>
             ))}
           </div>
         ) : null}
         {!isExisting ? (
           <p className="mt-3 border-t border-slate-100 pt-2.5 text-[11.5px] text-slate-400">
-            Demo parsing — review extracted skills before relying on the ranking. Saving parsed
-            resumes as candidates arrives with the Supabase backend.
+            Review the extracted skills before relying on the ranking.
           </p>
         ) : null}
       </CardBody>
@@ -641,13 +646,39 @@ function AnalysisProgress({ steps, onDone }: { steps: string[]; onDone: () => vo
     return () => window.clearTimeout(timer);
   }, [step, steps.length]);
 
+  const current = Math.min(step, steps.length - 1);
+  const done = Math.min(step, steps.length);
   const pct = (Math.min(step + 1, steps.length) / steps.length) * 100;
 
   return (
     <Card>
       <CardBody>
-        <h2 className="text-[15px] font-semibold text-ink">Analyzing resume…</h2>
-        <ul className="mt-3.5 space-y-2" aria-live="polite">
+        <div className="flex items-baseline justify-between gap-3">
+          <h2 className="text-[15px] font-semibold text-ink">Analyzing resume…</h2>
+          <span className="text-[11.5px] font-semibold tabular-nums text-slate-400">
+            Step {Math.min(done + 1, steps.length)} of {steps.length}
+          </span>
+        </div>
+
+        <div className="mt-3 flex items-center gap-2.5" aria-live="polite">
+          <Spinner className="size-4 shrink-0 text-primary" label="In progress" />
+          <p className="text-[13.5px] font-semibold text-ink">{steps[current]}</p>
+        </div>
+
+        <div
+          className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-200"
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={steps.length}
+          aria-valuenow={done}
+        >
+          <div
+            className="h-full rounded-full bg-primary transition-[width] duration-400 ease-out"
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+
+        <ul className="mt-4 space-y-2">
           {steps.map((label, index) => (
             <li
               key={label}
@@ -661,24 +692,19 @@ function AnalysisProgress({ steps, onDone }: { steps: string[]; onDone: () => vo
               )}
             >
               {index < step ? (
-                <span aria-hidden="true" className="font-bold text-primary">
-                  ✓
-                </span>
+                <Icon name="check" size={14} aria-hidden className="shrink-0 text-primary" />
               ) : index === step ? (
-                <Spinner className="size-3.5 text-primary" label="In progress" />
+                <Spinner className="size-3.5 shrink-0 text-primary" label="In progress" />
               ) : (
-                <span aria-hidden="true">○</span>
+                <span
+                  aria-hidden="true"
+                  className="size-3.5 shrink-0 rounded-full border border-slate-300"
+                />
               )}
               {label}
             </li>
           ))}
         </ul>
-        <div className="mt-4 h-2 overflow-hidden rounded-md bg-slate-200">
-          <div
-            className="h-full bg-primary transition-[width] duration-400 ease-out"
-            style={{ width: `${pct}%` }}
-          />
-        </div>
       </CardBody>
     </Card>
   );

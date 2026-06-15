@@ -10,7 +10,7 @@
  * Pure module — no I/O, safe in client components. Never throws.
  */
 
-import type { CandidateSkill } from "@/lib/data/types";
+import type { CandidateSkill, VisaType } from "@/lib/data/types";
 
 export interface ParsedResume {
   name: string;
@@ -18,6 +18,12 @@ export interface ParsedResume {
   skills: CandidateSkill[];
   certifications: string[];
   summary: string;
+  /**
+   * Work-authorization hint, when the AI parser can infer one from an explicit
+   * statement in the resume (e.g. a TN-visa line). The pure heuristic parser
+   * never sets this — it stays undefined on the offline path.
+   */
+  visaHint?: VisaType;
 }
 
 export const FALLBACK_NAME = "Pasted candidate";

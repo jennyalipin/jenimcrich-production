@@ -38,6 +38,18 @@ const statusVariant: Record<JobStatus, "success" | "warning" | "default"> = {
 
 const statusRank: Record<JobStatus, number> = { open: 0, on_hold: 1, closed: 2 };
 
+/** Full-word phrasing for the "Open for" tooltip — e.g. "2 months", "30 days". */
+function formatDaysFull(days: number): string {
+  const d = Math.max(0, Math.round(days));
+  if (d < 31) return `${d} day${d === 1 ? "" : "s"}`;
+  if (d < 365) {
+    const months = Math.round(d / 30);
+    return `${months} month${months === 1 ? "" : "s"}`;
+  }
+  const years = Math.round(d / 365);
+  return `${years} year${years === 1 ? "" : "s"}`;
+}
+
 const columns: ReadonlyArray<DataTableColumn<JobRow>> = [
   {
     key: "title",
@@ -46,7 +58,10 @@ const columns: ReadonlyArray<DataTableColumn<JobRow>> = [
       <div className="min-w-44">
         <p className="font-semibold text-ink">{row.title}</p>
         {row.skills.length > 0 ? (
-          <p className="mt-0.5 truncate text-xs text-slate-500">
+          <p
+            className="mt-0.5 truncate text-xs text-slate-500"
+            title={row.skills.map((s) => s.skill).join(", ")}
+          >
             {row.skills
               .slice(0, 3)
               .map((s) => s.skill)
@@ -118,7 +133,11 @@ const columns: ReadonlyArray<DataTableColumn<JobRow>> = [
     key: "days_open",
     header: "Open for",
     align: "right",
-    cell: (row) => <span className="tabular-nums text-slate-500">{formatDaysCompact(row.days_open)}</span>,
+    cell: (row) => (
+      <span className="tabular-nums text-slate-500" title={`Open for ${formatDaysFull(row.days_open)}`}>
+        {formatDaysCompact(row.days_open)}
+      </span>
+    ),
     sortValue: (row) => row.days_open,
     className: "w-20",
   },

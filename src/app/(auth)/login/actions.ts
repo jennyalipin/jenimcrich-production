@@ -14,7 +14,6 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import {
   createSessionToken,
-  DEMO_USER,
   SESSION_COOKIE_NAME,
   sessionCookieOptions,
   verifyDemoCredentials,
@@ -82,26 +81,6 @@ export async function signIn(
   }
 
   await establishDemoSession(parsed.data.email.trim().toLowerCase());
-  redirect("/dashboard");
-}
-
-/** One-click sign-in as the recruiter/owner (prototype's ⚡ Demo Login). */
-export async function demoSignIn(): Promise<void> {
-  const supabase = await getSupabaseServerClient();
-  if (supabase) {
-    const password = process.env.STAGING_USER_PASSWORD;
-    if (password) {
-      const { error } = await supabase.auth.signInWithPassword({
-        email: DEMO_USER.email,
-        password,
-      });
-      if (!error) redirect("/dashboard");
-    }
-    // No staging password configured — send the user to sign in explicitly.
-    redirect("/login");
-  }
-
-  await establishDemoSession(DEMO_USER.email);
   redirect("/dashboard");
 }
 

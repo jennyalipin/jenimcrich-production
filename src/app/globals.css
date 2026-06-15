@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
 /*
  * JeniMcRich Recruitment — design tokens
@@ -9,7 +10,6 @@
 
 @theme inline {
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  --font-serif: var(--font-fraunces), ui-serif, Georgia, "Times New Roman", serif;
   --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", monospace;
 }
 
@@ -21,9 +21,28 @@
   --color-sidebar-line: #334155; /* dividers on dark chrome */
   --color-ink: #0f172a; /* headings */
 
-  /* Legacy starter aliases (kept so existing pages don't break) */
-  --color-background: #f8fafc;
-  --color-foreground: #0f172a;
+  /* ---- shadcn/Radix semantic tokens — bridged to the emerald/slate system
+     so shadcn components render on-brand and obey the UI rules by default.
+     `--color-accent` here is shadcn's NEUTRAL hover/selected surface (not the
+     cyan interview accent, which is renamed to `interview` below). ---- */
+  --color-background: #ffffff;
+  --color-foreground: #1e293b; /* slate-800 — dense data text */
+  --color-card: #ffffff;
+  --color-card-foreground: #1e293b;
+  --color-popover: #ffffff;
+  --color-popover-foreground: #1e293b;
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #f1f5f9; /* slate-100 */
+  --color-secondary-foreground: #0f172a;
+  --color-muted: #f1f5f9;
+  --color-muted-foreground: #64748b; /* slate-500 */
+  --color-accent: #f1f5f9; /* neutral hover/selected (shadcn) */
+  --color-accent-foreground: #0f172a;
+  --color-destructive: #ef4444;
+  --color-destructive-foreground: #ffffff;
+  --color-border: #e2e8f0; /* slate-200 */
+  --color-input: #cbd5e1; /* slate-300 */
+  --color-ring: #059669; /* emerald focus ring */
 
   /* ---- Primary action (emerald) ---- */
   --color-primary: #059669;
@@ -46,10 +65,11 @@
   --color-info-soft: #dbeafe;
   --color-info-ink: #1e40af;
 
-  /* Interview-stage accent — cyan (deliberately not violet/indigo). */
-  --color-accent: #0891b2;
-  --color-accent-soft: #cffafe;
-  --color-accent-ink: #155e75;
+  /* Interview-stage accent — cyan (deliberately not violet/indigo). Renamed
+     from `accent` so it doesn't collide with shadcn's neutral `--color-accent`. */
+  --color-interview: #0891b2;
+  --color-interview-soft: #cffafe;
+  --color-interview-ink: #155e75;
 
   /* ---- Radii — tight 6px controls, surfaces step up (Ashby-style) ---- */
   --radius-control: 0.375rem; /* 6px */
@@ -70,11 +90,20 @@
   /* emerald focus halo + recessed control inset */
   --shadow-focus: 0 0 0 3px rgb(5 150 105 / 0.18);
   --shadow-input-inset: inset 0 1px 2px rgb(15 23 42 / 0.06);
+  /* Solid-button gloss (Ashby craft): top white highlight + defining hairline
+     ring + bottom inner shade, lifted by a tight neutral-cool drop. */
+  --shadow-button:
+    inset 0 1px 0 rgb(255 255 255 / 0.18), inset 0 0 0 1px rgb(15 23 42 / 0.12),
+    inset 0 -1px 0 rgb(15 23 42 / 0.18), 0 1px 2px -0.5px rgb(15 23 42 / 0.2),
+    0 2px 4px -2px rgb(15 23 42 / 0.16);
+  --shadow-button-press:
+    inset 0 1px 2px rgb(15 23 42 / 0.3), inset 0 0 0 1px rgb(15 23 42 / 0.16);
 
   /* ---- Motion ---- */
   --animate-toast-in: toast-in 0.25s ease both;
   --animate-modal-in: modal-in 0.18s cubic-bezier(0.16, 1, 0.3, 1) both;
   --animate-fade-in: fade-in 0.15s ease-out both;
+  --animate-rise: rise 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
 
   @keyframes toast-in {
     from {
@@ -104,9 +133,35 @@
       opacity: 1;
     }
   }
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
 }
 
 @layer base {
+  :root {
+    /* Plain var for shadcn components that reference var(--radius) directly.
+       Deliberately NOT a @theme token, so Tailwind's rounded-md/lg scale (and
+       our existing usages) stay on the v4 defaults. */
+    --radius: 0.5rem;
+  }
+
+  /* The app frame is a fixed h-dvh shell; pages scroll inside their own
+     regions (main, the kanban board, tables). Nothing should ever scroll the
+     document horizontally — `clip` guarantees it (e.g. the wide pipeline board
+     can't drag the whole layout / sidebar sideways). */
+  html,
+  body {
+    overflow-x: clip;
+  }
+
   body {
     background-color: var(--color-canvas);
     color: #1e293b; /* slate-800 — dense data reads better than near-black */
@@ -137,6 +192,39 @@
       scroll-behavior: auto !important;
     }
   }
+
+  /* Tasteful "deal-in": direct children rise in sequence on mount. Motion is
+     tied to load/navigation only and rests when idle; the reduced-motion guard
+     above collapses it to an instant render. Delays cap so long grids/lists
+     never feel laggy (total well under the 3s microinteraction budget). */
+  .stagger-children > * {
+    animation: var(--animate-rise);
+  }
+  .stagger-children > *:nth-child(2) {
+    animation-delay: 50ms;
+  }
+  .stagger-children > *:nth-child(3) {
+    animation-delay: 100ms;
+  }
+  .stagger-children > *:nth-child(4) {
+    animation-delay: 150ms;
+  }
+  .stagger-children > *:nth-child(5) {
+    animation-delay: 200ms;
+  }
+  .stagger-children > *:nth-child(n + 6) {
+    animation-delay: 240ms;
+  }
+
+  /* The Lottie notification bell bakes a black stroke as a presentation
+     attribute; recolor it to match the sibling topbar icons (slate-300, white
+     on hover). CSS wins over presentation attributes, so it holds every frame. */
+  button[aria-label^="Notifications"] svg path {
+    stroke: #cbd5e1;
+  }
+  button[aria-label^="Notifications"]:hover svg path {
+    stroke: #ffffff;
+  }
 }
 
 /* The system's shared micro-label register: table headers, field labels,
@@ -165,14 +253,6 @@
   font-weight: 650;
   letter-spacing: -0.022em;
   line-height: 1.15;
-}
-
-/* Serif accent — Signifier, for the occasional editorial word in a heading. */
-@utility serif-accent {
-  font-family: var(--font-serif);
-  font-weight: 500;
-  font-style: italic;
-  letter-spacing: -0.01em;
 }
 
 /* Slim slate scrollbar for kanban lanes / overflow tables. */
@@ -207,3 +287,4 @@
   background-size: 36px 100%, 36px 100%, 14px 100%, 14px 100%;
   background-attachment: local, local, scroll, scroll;
 }
+

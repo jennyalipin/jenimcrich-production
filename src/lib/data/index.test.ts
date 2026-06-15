@@ -1,15 +1,19 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
+  ACTIVE_STAGES,
   DataLayerError,
+  PIPELINE_STAGES,
   REFERENCE_NOW,
   STAGES,
   addNote,
   getActivityFeed,
+  getAnalytics,
   getApplicationsByStage,
   getCandidate,
   getDashboardStats,
   getInterviews,
   getJobs,
+  getPipelineBoard,
   getStalledApplications,
   getTemplates,
   isSlotTaken,
@@ -145,7 +149,8 @@ describe("dashboard & templates", () => {
     expect(stats.open_jobs).toBeGreaterThan(0);
     expect(stats.todays_interviews.length).toBeGreaterThan(0); // iv2 today 15:00 UTC
     expect(stats.upcoming_interviews.length).toBeLessThanOrEqual(5);
-    expect(stats.stalled_count).toBe(stats.stalled.length);
+    // The stalled list is capped (top N) for the dashboard; the count is the true total.
+    expect(stats.stalled.length).toBeLessThanOrEqual(stats.stalled_count);
     const total = STAGES.reduce((sum, st) => sum + stats.stage_counts[st], 0);
     expect(total).toBe(26);
   });
@@ -154,5 +159,80 @@ describe("dashboard & templates", () => {
     const templates = await getTemplates();
     expect(templates).toHaveLength(5);
     expect(templates[0]?.subject).toContain("{{job_title}}");
+  });
+});
+
+describe("scalable read models (analytics & pipeline)", () => {
+  it("getPipelineBoard: per-stage counts match the dashboard and cards are well-formed", async () => {
+    const board = await getPipelineBoard();
+    const stats = await getDashboardStats();
+
+    // The board's true counts mirror the dashboard's stage counts.
+    for (const stage of STAGES) {
+      expect(board.counts[stage]).toBe(stats.stage_counts[stage]);
+    }
+    // Under the default cap the demo seed shows every card.
+    const totalCount = STAGES.reduce((sum, st) => sum + board.counts[st], 0);
+    expect(board.cards.length).toBe(totalCount);
+
+    for (const card of board.cards) {
+      expect(card.applicationId).toBeTruthy();
+      expect(card.candidateName).toBeTruthy();
+      expect(STAGES).toContain(card.stage);
+      expect(card.score).toBeGreaterThanOrEqual(0);
+      expect(card.score).toBeLessThanOrEqual(100);
+      expect(card.daysInStage).toBeGreaterThanOrEqual(0);
+      expect(typeof card.flagged).toBe("boolean");
+      expect(typeof card.restrictiveVisa).toBe("boolean");
+      expect(typeof card.isStalled).toBe("boolean");
+    }
+  });
+
+  it("getPipelineBoard: caps cards per stage while keeping true counts", async () => {
+    const board = await getPipelineBoard(2);
+    for (const stage of STAGES) {
+      const shown = board.cards.filter((c) => c.stage === stage).length;
+      expect(shown).toBeLessThanOrEqual(2);
+      // The count is always the true total, even when the column is capped.
+      expect(board.counts[stage]).toBeGreaterThanOrEqual(shown);
+    }
+  });
+
+  it("getAnalytics: funnel, conversions and breakdowns are internally consistent", async () => {
+    const a = await getAnalytics();
+
+    expect(a.total_candidates).toBeGreaterThan(0);
+
+    // Funnel is reached-or-further counts → strictly non-increasing.
+    expect(a.funnel).toHaveLength(PIPELINE_STAGES.length);
+    expect(a.funnel[0]?.conversion_pct).toBe(100);
+    for (let i = 1; i < a.funnel.length; i += 1) {
+      expect(a.funnel[i]!.count).toBeLessThanOrEqual(a.funnel[i - 1]!.count);
+      expect(a.funnel[i]!.conversion_pct).toBeGreaterThanOrEqual(0);
+      expect(a.funnel[i]!.conversion_pct).toBeLessThanOrEqual(100);
+    }
+
+    expect(a.offers_accepted).toBeLessThanOrEqual(a.offers_extended);
+    for (const pct of [a.offer_acceptance_pct, a.interview_to_offer_pct]) {
+      expect(pct).toBeGreaterThanOrEqual(0);
+      expect(pct).toBeLessThanOrEqual(100);
+    }
+
+    expect(a.time_in_stage).toHaveLength(ACTIVE_STAGES.length);
+    for (const t of a.time_in_stage) {
+      expect(t.avg_days).toBeGreaterThanOrEqual(0);
+    }
+
+    let sourceTotal = 0;
+    for (const s of a.source_breakdown) {
+      expect(s.qualified).toBeGreaterThanOrEqual(0);
+      expect(s.qualified).toBeLessThanOrEqual(s.total);
+      sourceTotal += s.total;
+    }
+    expect(sourceTotal).toBeLessThanOrEqual(a.total_candidates);
+
+    for (const n of Object.values(a.activity_counts)) {
+      expect(n).toBeGreaterThanOrEqual(0);
+    }
   });
 });

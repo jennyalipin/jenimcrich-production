@@ -22,7 +22,7 @@ const INVITE_SUBJECT = "Interview Invitation – {{job_title}} at {{client}}";
 const INVITE_BODY =
   "Hi {{candidate_name}},\n\nThank you for your interest in the {{job_title}} role with {{client}}. " +
   "We would like to invite you to an interview.\n\nProposed date: {{interview_date}}\n\n" +
-  "Please confirm your availability.\n\nBest regards,\n{{recruiter_name}}\nJeniMcRich Recruitment";
+  "Please confirm your availability.\n\nBest regards,\n{{recruiter_name}}\nJenny Mcrich Recruitment";
 
 describe("mergeTemplate", () => {
   it("substitutes all six merge fields", () => {
@@ -43,7 +43,7 @@ describe("mergeTemplate", () => {
     expect(body).toContain("Hi Alex Miller,");
     expect(body).toContain("the Plant Manager – Cement role with Helix Cement Corp");
     expect(body).toContain("Proposed date: Jun 12, 2026");
-    expect(body).toContain("Best regards,\nJenny M.\nJeniMcRich Recruitment");
+    expect(body).toContain("Best regards,\nJenny M.\nJenny Mcrich Recruitment");
     expect(body).not.toContain("{{");
   });
 

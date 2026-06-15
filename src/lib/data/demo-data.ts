@@ -1,5 +1,5 @@
 /**
- * In-memory demo seed database for the JeniMcRich ATS.
+ * In-memory demo seed database for the Jenny Mcrich ATS.
  *
  * SERVER-ONLY. Pages must NEVER import this module directly — all access goes
  * through "@/lib/data" (index.ts), whose function signatures stay identical
@@ -482,7 +482,7 @@ const CANDIDATE_SEEDS: readonly CandidateSeed[] = [
     years_exp: 11, expected_salary: "$92,000/yr", notice_period: "14 days",
     skills: [["Rolling Mill Operations", 10], ["Production Planning", 8], ["Team Leadership", 9], ["Safety Compliance", 7]],
     certifications: ["OSHA 30"],
-    summary: "Rolling-mill production lead; placed by JeniMcRich at Ironclad Steelworks and started in March. US Green Card holder.",
+    summary: "Rolling-mill production lead; placed by Jenny Mcrich at Ironclad Steelworks and started in March. US Green Card holder.",
   },
 ];
 
@@ -572,13 +572,13 @@ const DOCUMENT_SEEDS: readonly DocSeed[] = [
 const TEMPLATE_SEEDS: ReadonlyArray<readonly [string, string, TemplateCategory, string, string]> = [
   ["t1", "Interview Invitation", "interview",
     "Interview Invitation – {{job_title}} at {{client}}",
-    "Hi {{candidate_name}},\n\nThank you for your interest in the {{job_title}} role with {{client}}. We would like to invite you to an interview.\n\nProposed date: {{interview_date}}\n\nPlease confirm your availability.\n\nBest regards,\n{{recruiter_name}}\nJeniMcRich Recruitment"],
+    "Hi {{candidate_name}},\n\nThank you for your interest in the {{job_title}} role with {{client}}. We would like to invite you to an interview.\n\nProposed date: {{interview_date}}\n\nPlease confirm your availability.\n\nBest regards,\n{{recruiter_name}}\nJenny Mcrich Recruitment"],
   ["t2", "Rejection – After Review", "rejection",
     "Update on your application – {{job_title}}",
-    "Hi {{candidate_name}},\n\nThank you for applying for the {{job_title}} position. After careful review, we have decided to move forward with other candidates at this time.\n\nWe will keep your profile in our talent pipeline for future roles.\n\nKind regards,\n{{recruiter_name}}\nJeniMcRich Recruitment"],
+    "Hi {{candidate_name}},\n\nThank you for applying for the {{job_title}} position. After careful review, we have decided to move forward with other candidates at this time.\n\nWe will keep your profile in our talent pipeline for future roles.\n\nKind regards,\n{{recruiter_name}}\nJenny Mcrich Recruitment"],
   ["t3", "Offer Letter Cover", "offer",
     "Offer of Employment – {{job_title}}",
-    "Dear {{candidate_name}},\n\nCongratulations! {{client}} is pleased to extend an offer for the position of {{job_title}}.\n\nPlease find the formal offer attached. Kindly confirm receipt and respond within 5 business days.\n\nWarm regards,\n{{recruiter_name}}\nJeniMcRich Recruitment"],
+    "Dear {{candidate_name}},\n\nCongratulations! {{client}} is pleased to extend an offer for the position of {{job_title}}.\n\nPlease find the formal offer attached. Kindly confirm receipt and respond within 5 business days.\n\nWarm regards,\n{{recruiter_name}}\nJenny Mcrich Recruitment"],
   ["t4", "Status Update – In Progress", "update",
     "Your application status – {{job_title}}",
     "Hi {{candidate_name}},\n\nA quick update: your application for {{job_title}} is currently at the {{stage}} stage. We will reach out with next steps shortly.\n\nThanks for your patience,\n{{recruiter_name}}"],

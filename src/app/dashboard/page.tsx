@@ -8,8 +8,8 @@ import {
   displayNow,
   type ActivityFeedItem,
   type ActivityType,
-  type InterviewWithRelations,
-  type StalledApplication,
+  type DashboardInterview,
+  type DashboardStalled,
 } from "@/lib/data";
 import { formatDayLabel, formatTime, relativeTime } from "@/lib/format";
 import {
@@ -26,7 +26,7 @@ import { PipelineSummaryBar } from "@/components/charts/pipeline-summary-bar";
 import { StatCard } from "@/components/charts/stat-card";
 
 export const metadata: Metadata = {
-  title: "Dashboard — JeniMcRich Recruitment",
+  title: "Dashboard — Jenny Mcrich Recruitment",
 };
 
 const DAY_MS = 86_400_000;
@@ -40,6 +40,8 @@ const ACTIVITY_ICONS: Record<ActivityType, IconName> = {
   tag: "tag",
   flag: "flag",
   scorecard: "scorecard",
+  compliance: "visa",
+  legal_review: "verified",
   system: "system",
 };
 
@@ -47,7 +49,7 @@ const thClass =
   "micro-label px-4 py-2.5 text-left text-slate-500 first:pl-5 last:pr-5";
 const tdClass = "px-4 py-2.5 align-middle first:pl-5 last:pr-5";
 
-function TodayBanner({ interviews }: { interviews: InterviewWithRelations[] }) {
+function TodayBanner({ interviews }: { interviews: DashboardInterview[] }) {
   if (interviews.length === 0) return null;
   return (
     <Card className="flex items-start gap-2.5 px-5 py-3.5">
@@ -57,7 +59,7 @@ function TodayBanner({ interviews }: { interviews: InterviewWithRelations[] }) {
         {interviews
           .map(
             (iv) =>
-              `${iv.candidate.full_name} (${INTERVIEW_TYPE_LABELS[iv.interview_type]}, ${formatTime(iv.starts_at)})`,
+              `${iv.candidate_name} (${INTERVIEW_TYPE_LABELS[iv.interview_type]}, ${formatTime(iv.starts_at)})`,
           )
           .join(" · ")}{" "}
         —{" "}
@@ -69,7 +71,7 @@ function TodayBanner({ interviews }: { interviews: InterviewWithRelations[] }) {
   );
 }
 
-function UpcomingInterviews({ interviews }: { interviews: InterviewWithRelations[] }) {
+function UpcomingInterviews({ interviews }: { interviews: DashboardInterview[] }) {
   if (interviews.length === 0) {
     return (
       <EmptyState
@@ -88,21 +90,21 @@ function UpcomingInterviews({ interviews }: { interviews: InterviewWithRelations
               href={`/candidates/${iv.candidate_id}`}
               className="text-[13.5px] font-semibold text-ink hover:text-primary hover:underline"
             >
-              {iv.candidate.full_name}
+              {iv.candidate_name}
             </Link>
             <p className="mt-0.5 truncate text-xs text-slate-500">
               {INTERVIEW_TYPE_LABELS[iv.interview_type]} · {formatDayLabel(iv.starts_at)}{" "}
               {formatTime(iv.starts_at)} · {iv.interviewer_name}
             </p>
           </div>
-          <StageBadge stage={iv.application.stage} />
+          <StageBadge stage={iv.stage} />
         </li>
       ))}
     </ul>
   );
 }
 
-function StalledTable({ stalled }: { stalled: StalledApplication[] }) {
+function StalledTable({ stalled, total }: { stalled: DashboardStalled[]; total: number }) {
   if (stalled.length === 0) {
     return (
       <EmptyState
@@ -139,11 +141,11 @@ function StalledTable({ stalled }: { stalled: StalledApplication[] }) {
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
-          {stalled.map((app) => (
-            <tr key={app.id} className="hover:bg-slate-50">
+          {stalled.slice(0, 8).map((app) => (
+            <tr key={app.application_id} className="hover:bg-slate-50">
               <td className={`${tdClass} font-semibold text-ink`}>
-                {app.candidate.full_name}
-                {app.candidate.flagged ? (
+                {app.candidate_name}
+                {app.candidate_flagged ? (
                   <Icon
                     name="flag"
                     size={13}
@@ -153,8 +155,8 @@ function StalledTable({ stalled }: { stalled: StalledApplication[] }) {
                 ) : null}
               </td>
               <td className={`${tdClass} text-slate-600`}>
-                {app.job.title}
-                <span className="block text-xs text-slate-400">{app.job.client_name}</span>
+                {app.job_title}
+                <span className="block text-xs text-slate-400">{app.client_name}</span>
               </td>
               <td className={tdClass}>
                 <StageBadge stage={app.stage} />
@@ -176,6 +178,13 @@ function StalledTable({ stalled }: { stalled: StalledApplication[] }) {
           ))}
         </tbody>
       </table>
+      {total > 8 ? (
+        <div className="border-t border-slate-100 px-5 py-2.5">
+          <Link href="/candidates" className="text-[13px] text-primary hover:underline">
+            Showing 8 of {total} — view all in Candidates →
+          </Link>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -192,7 +201,7 @@ function ActivityFeed({ activity }: { activity: ActivityFeedItem[] }) {
   }
   return (
     <ul className="divide-y divide-slate-100">
-      {activity.map((item) => (
+      {activity.slice(0, 8).map((item) => (
         <li key={item.id} className="flex gap-3 px-5 py-3">
           <span
             aria-hidden="true"
@@ -216,6 +225,9 @@ function ActivityFeed({ activity }: { activity: ActivityFeedItem[] }) {
           </div>
         </li>
       ))}
+      {activity.length > 8 ? (
+        <li className="px-5 py-2.5 text-xs text-slate-400">Showing recent activity</li>
+      ) : null}
     </ul>
   );
 }
@@ -233,15 +245,33 @@ export default async function DashboardPage() {
     }),
   ]);
 
+  // Greeting in the agency's timezone (PH, UTC+8); editorial focal header.
+  const phHour = (displayNow().getUTCHours() + 8) % 24;
+  const greeting =
+    phHour < 12 ? "Good morning" : phHour < 18 ? "Good afternoon" : "Good evening";
+
   return (
     <div className="space-y-4 p-6">
+      <header className="pb-1">
+        <p className="eyebrow">Recruiter workspace</p>
+        <p className="heading-tight mt-1 text-[26px] text-ink">
+          {greeting}, Jenny — the{" "}
+          <span className="text-primary">pipeline</span> is moving
+        </p>
+        <p className="mt-1.5 text-[13.5px] text-slate-500">
+          {stats.active_candidates} candidates active across {stats.open_jobs} open
+          role{stats.open_jobs === 1 ? "" : "s"} · {stats.stalled_count} need a nudge ·{" "}
+          {weekInterviews.length} interview{weekInterviews.length === 1 ? "" : "s"} this week
+        </p>
+      </header>
+
       <TodayBanner interviews={stats.todays_interviews} />
 
       <section aria-labelledby="dashboard-kpis">
         <h2 id="dashboard-kpis" className="sr-only">
           Key metrics
         </h2>
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5">
+        <div className="stagger-children grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5">
           <StatCard
             label="Active candidates"
             value={stats.active_candidates}
@@ -271,7 +301,7 @@ export default async function DashboardPage() {
         </div>
       </section>
 
-      <section aria-labelledby="dashboard-pipeline" className="grid gap-4 lg:grid-cols-2">
+      <section aria-labelledby="dashboard-pipeline" className="stagger-children grid gap-4 lg:grid-cols-2">
         <h2 id="dashboard-pipeline" className="sr-only">
           Pipeline and interviews
         </h2>
@@ -309,7 +339,7 @@ export default async function DashboardPage() {
 
       <section
         aria-labelledby="dashboard-attention"
-        className="grid gap-4 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]"
+        className="stagger-children grid gap-4 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]"
       >
         <h2 id="dashboard-attention" className="sr-only">
           Needs attention and recent activity
@@ -324,7 +354,7 @@ export default async function DashboardPage() {
               </Link>
             </p>
           </CardHeader>
-          <StalledTable stalled={stats.stalled} />
+          <StalledTable stalled={stats.stalled} total={stats.stalled_count} />
         </Card>
 
         <Card>

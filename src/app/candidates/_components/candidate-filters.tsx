@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { Button, Card, CardBody, Icon, Input } from "@/components/ui";
+import { AnimatedCheckbox } from "@/components/ui/animated-checkbox";
 import { STAGES, STAGE_LABELS, type Stage } from "@/lib/data/types";
 import type { CandidateFilterState } from "../_lib/view-types";
 
@@ -19,9 +20,6 @@ function buildHref(state: CandidateFilterState): string {
 function toggle<T>(list: T[], value: T): T[] {
   return list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
 }
-
-const checkboxClass =
-  "h-3.5 w-3.5 shrink-0 rounded border-slate-300 accent-emerald-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600";
 
 /** URL-driven filter rail: search, stage, tags, flagged. */
 export function CandidateFilters({
@@ -61,7 +59,7 @@ export function CandidateFilters({
   const hasFilters = state.q !== "" || state.stages.length > 0 || state.tags.length > 0 || state.flagged;
 
   return (
-    <Card className="w-full shrink-0 lg:w-60">
+    <Card className="w-full shrink-0 lg:sticky lg:top-6 lg:w-60 lg:self-start">
       <CardBody className="space-y-5">
         <div>
           <p className="micro-label mb-2 text-slate-500">Search</p>
@@ -79,15 +77,13 @@ export function CandidateFilters({
           <legend className="micro-label mb-2 text-slate-500">Stage</legend>
           <div className="space-y-1.5">
             {STAGES.map((stage: Stage) => (
-              <label key={stage} className="flex cursor-pointer items-center gap-2 text-[13px] text-slate-600">
-                <input
-                  type="checkbox"
-                  className={checkboxClass}
-                  checked={state.stages.includes(stage)}
-                  onChange={() => navigate({ ...state, stages: toggle(state.stages, stage) })}
-                />
+              <AnimatedCheckbox
+                key={stage}
+                checked={state.stages.includes(stage)}
+                onChange={() => navigate({ ...state, stages: toggle(state.stages, stage) })}
+              >
                 {STAGE_LABELS[stage]}
-              </label>
+              </AnimatedCheckbox>
             ))}
           </div>
         </fieldset>
@@ -99,29 +95,25 @@ export function CandidateFilters({
           ) : (
             <div className="space-y-1.5">
               {allTags.map((tag) => (
-                <label key={tag} className="flex cursor-pointer items-center gap-2 text-[13px] text-slate-600">
-                  <input
-                    type="checkbox"
-                    className={checkboxClass}
-                    checked={state.tags.includes(tag)}
-                    onChange={() => navigate({ ...state, tags: toggle(state.tags, tag) })}
-                  />
+                <AnimatedCheckbox
+                  key={tag}
+                  checked={state.tags.includes(tag)}
+                  onChange={() => navigate({ ...state, tags: toggle(state.tags, tag) })}
+                >
                   <span className="truncate">{tag}</span>
-                </label>
+                </AnimatedCheckbox>
               ))}
             </div>
           )}
         </fieldset>
 
-        <label className="flex cursor-pointer items-center gap-2 text-[13px] font-medium text-slate-700">
-          <input
-            type="checkbox"
-            className={checkboxClass}
-            checked={state.flagged}
-            onChange={() => navigate({ ...state, flagged: !state.flagged })}
-          />
+        <AnimatedCheckbox
+          className="font-medium text-slate-700"
+          checked={state.flagged}
+          onChange={() => navigate({ ...state, flagged: !state.flagged })}
+        >
           <Icon name="star" size={14} fill className="text-amber-400" /> Flagged only
-        </label>
+        </AnimatedCheckbox>
 
         <Button
           variant="ghost"

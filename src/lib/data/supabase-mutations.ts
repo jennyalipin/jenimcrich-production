@@ -20,6 +20,7 @@
  */
 
 import { DataLayerError } from "./types";
+import { matchScore } from "@/lib/scoring";
 import type { SupabaseServerClient } from "@/lib/supabase/server";
 import type {
   ActivityType,
@@ -32,6 +33,8 @@ import type {
   Source,
   Stage,
   StalledDays,
+  TemplateCategory,
+  TnComplianceRecord,
 } from "./types";
 
 type DbSource = "linkedin" | "referral" | "job_portal" | "indeed" | "agency" | "other";
@@ -71,6 +74,23 @@ export async function currentProfileId(supabase: SupabaseServerClient): Promise<
     .eq("user_id", user.id)
     .maybeSingle();
   return data?.id ?? null;
+}
+
+/**
+ * The signed-in user's role (admin | recruiter | hiring_manager), or null.
+ * A defence-in-depth check for server actions; RLS is still the real gate.
+ */
+export async function currentProfileRole(supabase: SupabaseServerClient): Promise<string | null> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+  const { data } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("user_id", user.id)
+    .maybeSingle();
+  return (data?.role as string | undefined) ?? null;
 }
 
 async function writeActivity(
@@ -260,6 +280,61 @@ export async function sbUpdateSettings(
 /* Candidate overlay writes (store-bridge)                             */
 /* ------------------------------------------------------------------ */
 
+const clampWeight = (n: number): 1 | 2 | 3 => (n <= 1 ? 1 : n >= 3 ? 3 : 2);
+
+/**
+ * Recompute + persist applications.match_score for one candidate (the cache
+ * the paginated list sorts by — domain rule 2). Call after anything that
+ * changes a candidate's scoring inputs (creation, skill edits, new application).
+ * Best-effort: a scoring failure must never break the surrounding mutation.
+ */
+export async function recomputeCandidateScores(
+  supabase: SupabaseServerClient,
+  candidateId: string,
+): Promise<void> {
+  try {
+    const [{ data: cand }, { data: skills }, { data: certs }, { data: apps }] = await Promise.all([
+      supabase.from("candidates").select("full_name, years_exp").eq("id", candidateId).maybeSingle(),
+      supabase.from("candidate_skills").select("skill, years").eq("candidate_id", candidateId),
+      supabase.from("candidate_certifications").select("name").eq("candidate_id", candidateId),
+      supabase.from("applications").select("id, job_id").eq("candidate_id", candidateId),
+    ]);
+    if (!cand || !apps || apps.length === 0) return;
+
+    const jobIds = apps.map((a) => a.job_id);
+    const [{ data: jobs }, { data: jsk }] = await Promise.all([
+      supabase.from("jobs").select("id, min_years").in("id", jobIds),
+      supabase.from("job_skills").select("job_id, skill, weight").in("job_id", jobIds),
+    ]);
+    const jobById = new Map((jobs ?? []).map((j) => [j.id, j]));
+    const skByJob = new Map<string, { skill: string; weight: 1 | 2 | 3 }[]>();
+    for (const r of jsk ?? []) {
+      const l = skByJob.get(r.job_id) ?? [];
+      l.push({ skill: r.skill, weight: clampWeight(r.weight) });
+      skByJob.set(r.job_id, l);
+    }
+
+    const candInput = {
+      name: cand.full_name,
+      yearsExp: cand.years_exp,
+      skills: (skills ?? []).map((s) => ({ skill: s.skill, years: s.years })),
+      certifications: (certs ?? []).map((c) => c.name),
+    };
+    const now = new Date().toISOString();
+    for (const a of apps) {
+      const job = jobById.get(a.job_id);
+      if (!job) continue;
+      const score = matchScore(candInput, {
+        minYears: job.min_years,
+        skills: skByJob.get(job.id) ?? [],
+      }).score;
+      await supabase.from("applications").update({ match_score: score, scored_at: now }).eq("id", a.id);
+    }
+  } catch {
+    /* scoring is a cache; never block the write on it */
+  }
+}
+
 export async function sbInsertCandidate(
   supabase: SupabaseServerClient,
   input: {
@@ -318,7 +393,78 @@ export async function sbInsertCandidate(
     .insert({ candidate_id: candidateId, job_id: input.job_id, stage: "applied" });
   fail("create the first application", appErr);
 
+  // Populate the match_score cache so the new candidate ranks correctly.
+  await recomputeCandidateScores(supabase, candidateId);
+
   return { id: candidateId, duplicateEmail };
+}
+
+/**
+ * Bulk-import a candidate (no application). Skips (does not insert) when an
+ * active candidate already has the same email — the caller counts these as
+ * "skipped" so re-importing a CSV is safe.
+ */
+export async function sbImportCandidate(
+  supabase: SupabaseServerClient,
+  input: {
+    full_name: string;
+    email: string;
+    phone: string;
+    location: string;
+    source: Source;
+    years_exp: number;
+    summary: string;
+    skills: { skill: string; years: number }[];
+    certifications: string[];
+    tags: string[];
+  },
+): Promise<{ id: string; duplicateEmail: boolean }> {
+  const email = input.email.trim();
+  if (email) {
+    const { data: dupes } = await supabase
+      .from("candidates")
+      .select("id")
+      .is("archived_at", null)
+      .ilike("email", email);
+    if ((dupes?.length ?? 0) > 0) return { id: "", duplicateEmail: true };
+  }
+
+  const { data: cand, error: candErr } = await supabase
+    .from("candidates")
+    .insert({
+      full_name: input.full_name.trim(),
+      email: email || null,
+      phone: input.phone.trim(),
+      location: input.location.trim(),
+      source: SOURCE_TO_DB[input.source],
+      years_exp: input.years_exp,
+      summary: input.summary.trim(),
+    })
+    .select("id")
+    .single();
+  fail("import the candidate", candErr);
+  const candidateId = cand!.id;
+
+  if (input.skills.length > 0) {
+    const { error } = await supabase
+      .from("candidate_skills")
+      .insert(input.skills.map((s) => ({ candidate_id: candidateId, skill: s.skill, years: s.years })));
+    fail("import the candidate's skills", error);
+  }
+  if (input.certifications.length > 0) {
+    const { error } = await supabase
+      .from("candidate_certifications")
+      .insert(input.certifications.map((name) => ({ candidate_id: candidateId, name })));
+    fail("import the candidate's certifications", error);
+  }
+  if (input.tags.length > 0) {
+    const { error } = await supabase
+      .from("candidate_tags")
+      .insert(input.tags.map((tag) => ({ candidate_id: candidateId, tag })));
+    fail("import the candidate's tags", error);
+  }
+
+  return { id: candidateId, duplicateEmail: false };
 }
 
 export async function sbSetCandidateFlag(
@@ -470,4 +616,309 @@ export async function sbGetJobNotes(
       created_at: n.created_at,
     };
   });
+}
+
+/* ------------------------------- templates ------------------------------- */
+
+interface TemplateInput {
+  name: string;
+  category: TemplateCategory;
+  subject: string;
+  body: string;
+}
+
+/** The unique-name clash Postgres raises on the `email_templates.name` index. */
+function failTemplateName(name: string, error: { code?: string } | null): void {
+  if (error?.code === "23505") {
+    throw new DataLayerError(
+      "VALIDATION",
+      `A template named "${name}" already exists — pick a different name.`,
+    );
+  }
+}
+
+/** Insert a new template, or update the existing row when `id` is given. */
+export async function sbSaveTemplate(
+  supabase: SupabaseServerClient,
+  input: TemplateInput & { id: string | null },
+): Promise<{ id: string }> {
+  const row = {
+    name: input.name.trim(),
+    category: input.category,
+    subject: input.subject,
+    body: input.body,
+  };
+
+  if (input.id) {
+    const { data, error } = await supabase
+      .from("email_templates")
+      .update({ ...row, updated_at: new Date().toISOString() })
+      .eq("id", input.id)
+      .select("id")
+      .single();
+    failTemplateName(row.name, error);
+    fail("save the template", error);
+    return { id: data!.id };
+  }
+
+  const createdBy = await currentProfileId(supabase);
+  const { data, error } = await supabase
+    .from("email_templates")
+    .insert({ ...row, created_by: createdBy })
+    .select("id")
+    .single();
+  failTemplateName(row.name, error);
+  fail("save the template", error);
+  return { id: data!.id };
+}
+
+/** Soft-delete a template (never hard-delete — the email log references it). */
+export async function sbDeleteTemplate(
+  supabase: SupabaseServerClient,
+  id: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from("email_templates")
+    .update({ archived_at: new Date().toISOString() })
+    .eq("id", id);
+  fail("delete the template", error);
+}
+
+/**
+ * Bulk-import templates (e.g. pasted from Gmail). Names already in the library
+ * are skipped, so re-importing the same set is safe.
+ */
+export async function sbImportTemplates(
+  supabase: SupabaseServerClient,
+  rows: TemplateInput[],
+): Promise<{ imported: number; skipped: number }> {
+  const { data: existing } = await supabase
+    .from("email_templates")
+    .select("name")
+    .is("archived_at", null);
+  const taken = new Set((existing ?? []).map((r) => r.name.trim().toLowerCase()));
+  const createdBy = await currentProfileId(supabase);
+
+  let imported = 0;
+  let skipped = 0;
+  for (const r of rows) {
+    const name = r.name.trim();
+    const key = name.toLowerCase();
+    if (taken.has(key)) {
+      skipped++;
+      continue;
+    }
+    const { error } = await supabase
+      .from("email_templates")
+      .insert({ name, category: r.category, subject: r.subject, body: r.body, created_by: createdBy });
+    if (error?.code === "23505") {
+      skipped++;
+      continue;
+    }
+    fail("import the template", error);
+    taken.add(key);
+    imported++;
+  }
+  return { imported, skipped };
+}
+
+/* ----------------------------- sample-data reset ----------------------------- */
+
+const ZERO_UUID = "00000000-0000-0000-0000-000000000000";
+
+/** Loosely-typed view for iterating deletes over table names (no `any`). */
+interface DeletableTable {
+  delete(): {
+    neq(column: string, value: string): Promise<{ error: { message: string; code?: string } | null }>;
+  };
+}
+
+/**
+ * Wipe the seeded sample business data so the workspace starts clean for real
+ * use. Children are deleted before parents to respect FK references. Email
+ * templates, settings, profiles, AI chat history and notification state are
+ * intentionally kept. ⚠️ Run with the service-role client (RLS keeps app roles
+ * from hard-deleting candidates — this is a deliberate admin maintenance path).
+ */
+export async function sbPurgeSampleData(
+  admin: SupabaseServerClient,
+): Promise<{ candidates: number; jobs: number }> {
+  const [{ count: candidates }, { count: jobs }] = await Promise.all([
+    admin.from("candidates").select("id", { count: "exact", head: true }),
+    admin.from("jobs").select("id", { count: "exact", head: true }),
+  ]);
+
+  // FK-safe order: every table has a uuid `id`, so the zero-uuid neq matches
+  // all real rows. Cascades may empty some early — re-deleting is harmless.
+  const order = [
+    "documents",
+    "email_log",
+    "activity_log",
+    "scorecards",
+    "interviews",
+    "notes",
+    "candidate_tags",
+    "candidate_skills",
+    "candidate_certifications",
+    "applications",
+    "candidates",
+    "job_skills",
+    "job_notes",
+    "jobs",
+    "clients",
+  ];
+  const db = admin as unknown as { from(table: string): DeletableTable };
+  for (const table of order) {
+    const { error } = await db.from(table).delete().neq("id", ZERO_UUID);
+    fail(`clear sample ${table}`, error);
+  }
+
+  return { candidates: candidates ?? 0, jobs: jobs ?? 0 };
+}
+
+/* ------------------------------------------------------------------ */
+/* TN / USMCA compliance writes (migration 0013)                       */
+/* ------------------------------------------------------------------ */
+
+/** Columns the `tn_compliance` table returns (DB-generated cols read-only). */
+const TN_COLUMNS =
+  "id, application_id, job_title_at_check, tn_eligible, matched_occupation, " +
+  "eligibility_confidence, legal_review_required, legal_review_cleared_at, " +
+  "legal_review_cleared_by, legal_review_notes, hired_at, employment_ended_at, " +
+  "retention_until, created_at, updated_at, archived_at";
+
+/** The signed-in user's candidate_id for an application (for the audit row). */
+async function candidateIdForApplication(
+  supabase: SupabaseServerClient,
+  applicationId: string,
+): Promise<string> {
+  const { data, error } = await supabase
+    .from("applications")
+    .select("candidate_id")
+    .eq("id", applicationId)
+    .maybeSingle();
+  fail("load the application", error);
+  if (!data) throw new DataLayerError("NOT_FOUND", "That application could not be found.");
+  return data.candidate_id;
+}
+
+/**
+ * Upsert the TN eligibility screen result for one application (unique by
+ * `application_id`) and log a `compliance` activity row. The result is NOT
+ * legal advice — `legal_review_required` carries the attorney-review interlock
+ * straight through from lib/tn-eligibility.
+ */
+export async function sbUpsertTnCompliance(
+  supabase: SupabaseServerClient,
+  input: {
+    application_id: string;
+    job_title_at_check: string;
+    tn_eligible: boolean;
+    matched_occupation: string | null;
+    eligibility_confidence: "exact" | "keyword" | "none";
+    legal_review_required: boolean;
+  },
+): Promise<TnComplianceRecord> {
+  const actorId = await currentProfileId(supabase);
+  const candidateId = await candidateIdForApplication(supabase, input.application_id);
+
+  const { data, error } = await supabase
+    .from("tn_compliance")
+    .upsert(
+      {
+        application_id: input.application_id,
+        job_title_at_check: input.job_title_at_check,
+        tn_eligible: input.tn_eligible,
+        matched_occupation: input.matched_occupation,
+        eligibility_confidence: input.eligibility_confidence,
+        legal_review_required: input.legal_review_required,
+      },
+      { onConflict: "application_id" },
+    )
+    .select(TN_COLUMNS)
+    .single();
+  fail("save the TN eligibility screen", error);
+
+  await writeActivity(
+    supabase,
+    actorId,
+    candidateId,
+    "compliance",
+    `TN eligibility screened: ${input.tn_eligible ? "may qualify" : "does not qualify"}` +
+      `${input.matched_occupation ? ` (${input.matched_occupation})` : ""} — pending legal review`,
+  );
+  return data as unknown as TnComplianceRecord;
+}
+
+/**
+ * Clear the legal-review interlock on a TN-compliance record (admin-only — the
+ * caller re-checks the role, and RLS still applies). Records the attorney
+ * sign-off in a `legal_review` activity row.
+ */
+export async function sbClearLegalReview(
+  supabase: SupabaseServerClient,
+  applicationId: string,
+  notes: string,
+): Promise<TnComplianceRecord> {
+  const actorId = await currentProfileId(supabase);
+  const candidateId = await candidateIdForApplication(supabase, applicationId);
+
+  const { data, error } = await supabase
+    .from("tn_compliance")
+    .update({
+      legal_review_required: false,
+      legal_review_cleared_at: new Date().toISOString(),
+      legal_review_cleared_by: actorId,
+      legal_review_notes: notes.trim() || null,
+    })
+    .eq("application_id", applicationId)
+    .select(TN_COLUMNS)
+    // maybeSingle (not single): zero rows must return null so the guard below
+    // fires with a human message instead of a raw PGRST116 error.
+    .maybeSingle();
+  fail("clear the legal review", error);
+  if (!data) {
+    throw new DataLayerError(
+      "NOT_FOUND",
+      "There is no TN screen to clear yet — run the eligibility check first.",
+    );
+  }
+
+  await writeActivity(
+    supabase,
+    actorId,
+    candidateId,
+    "legal_review",
+    `Legal review cleared by immigration attorney${notes.trim() ? ` — ${notes.trim()}` : ""}`,
+  );
+  return data as unknown as TnComplianceRecord;
+}
+
+/** Read the TN-compliance record for an application, or null. */
+export async function sbGetTnCompliance(
+  supabase: SupabaseServerClient,
+  applicationId: string,
+): Promise<TnComplianceRecord | null> {
+  const { data, error } = await supabase
+    .from("tn_compliance")
+    .select(TN_COLUMNS)
+    .eq("application_id", applicationId)
+    .is("archived_at", null)
+    .maybeSingle();
+  fail("load the TN compliance record", error);
+  return (data as unknown as TnComplianceRecord | null) ?? null;
+}
+
+/** Document categories present (non-archived) for a candidate — for the checklist. */
+export async function sbGetCandidateDocCategories(
+  supabase: SupabaseServerClient,
+  candidateId: string,
+): Promise<string[]> {
+  const { data, error } = await supabase
+    .from("documents")
+    .select("category")
+    .eq("candidate_id", candidateId)
+    .is("archived_at", null);
+  fail("load the candidate's documents", error);
+  return (data ?? []).map((d) => d.category as string);
 }

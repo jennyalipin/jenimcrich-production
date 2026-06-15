@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { ReactNode } from "react";
-import { LogoMark } from "@/components/ui";
+import { useSyncExternalStore } from "react";
+import { Icon, LogoMark, cn, type IconName } from "@/components/ui";
 
 /**
  * Fixed-width navigation rail for the JeniMcRich shell.
@@ -12,158 +12,80 @@ import { LogoMark } from "@/components/ui";
  * Dark frame color is the exact brief hex (#0f172a); active route is emerald-600.
  */
 
-function NavSvg({ children }: { children: ReactNode }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.8}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="h-[18px] w-[18px] shrink-0"
-      aria-hidden="true"
-    >
-      {children}
-    </svg>
-  );
-}
-
 type NavItem = {
   href: string;
   label: string;
-  icon: ReactNode;
+  icon: IconName;
 };
 
 const NAV_ITEMS: NavItem[] = [
-  {
-    href: "/dashboard",
-    label: "Dashboard",
-    icon: (
-      <NavSvg>
-        <rect x="3" y="3" width="7" height="9" rx="1" />
-        <rect x="14" y="3" width="7" height="5" rx="1" />
-        <rect x="14" y="12" width="7" height="9" rx="1" />
-        <rect x="3" y="16" width="7" height="5" rx="1" />
-      </NavSvg>
-    ),
-  },
-  {
-    href: "/candidates",
-    label: "Candidates",
-    icon: (
-      <NavSvg>
-        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-        <circle cx="9" cy="7" r="4" />
-        <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-      </NavSvg>
-    ),
-  },
-  {
-    href: "/pipeline",
-    label: "Pipeline",
-    icon: (
-      <NavSvg>
-        <rect x="3" y="3" width="5" height="12" rx="1" />
-        <rect x="9.5" y="3" width="5" height="16" rx="1" />
-        <rect x="16" y="3" width="5" height="9" rx="1" />
-      </NavSvg>
-    ),
-  },
-  {
-    href: "/matchmaker",
-    label: "Matchmaker",
-    icon: (
-      <NavSvg>
-        <circle cx="12" cy="12" r="9" />
-        <circle cx="12" cy="12" r="5" />
-        <circle cx="12" cy="12" r="1" />
-      </NavSvg>
-    ),
-  },
-  {
-    href: "/jobs",
-    label: "Jobs",
-    icon: (
-      <NavSvg>
-        <rect x="2" y="7" width="20" height="14" rx="2" />
-        <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" />
-      </NavSvg>
-    ),
-  },
-  {
-    href: "/calendar",
-    label: "Calendar",
-    icon: (
-      <NavSvg>
-        <rect x="3" y="4" width="18" height="17" rx="2" />
-        <path d="M16 2v4" />
-        <path d="M8 2v4" />
-        <path d="M3 10h18" />
-      </NavSvg>
-    ),
-  },
-  {
-    href: "/templates",
-    label: "Templates",
-    icon: (
-      <NavSvg>
-        <rect x="2" y="4" width="20" height="16" rx="2" />
-        <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
-      </NavSvg>
-    ),
-  },
-  {
-    href: "/analytics",
-    label: "Analytics",
-    icon: (
-      <NavSvg>
-        <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" />
-        <polyline points="16 7 22 7 22 13" />
-      </NavSvg>
-    ),
-  },
-  {
-    href: "/settings",
-    label: "Settings",
-    icon: (
-      <NavSvg>
-        <line x1="21" x2="14" y1="5" y2="5" />
-        <line x1="10" x2="3" y1="5" y2="5" />
-        <line x1="21" x2="12" y1="12" y2="12" />
-        <line x1="8" x2="3" y1="12" y2="12" />
-        <line x1="21" x2="16" y1="19" y2="19" />
-        <line x1="12" x2="3" y1="19" y2="19" />
-        <line x1="14" x2="14" y1="3" y2="7" />
-        <line x1="8" x2="8" y1="10" y2="14" />
-        <line x1="16" x2="16" y1="17" y2="21" />
-      </NavSvg>
-    ),
-  },
+  { href: "/dashboard", label: "Dashboard", icon: "dashboard" },
+  { href: "/candidates", label: "Candidates", icon: "candidates" },
+  { href: "/pipeline", label: "Pipeline", icon: "stage" },
+  { href: "/matchmaker", label: "Matchmaker", icon: "matchmaker" },
+  { href: "/jobs", label: "Jobs", icon: "jobs" },
+  { href: "/calendar", label: "Calendar", icon: "calendar" },
+  { href: "/templates", label: "Templates", icon: "email" },
+  { href: "/analytics", label: "Analytics", icon: "target" },
+  { href: "/settings", label: "Settings", icon: "settings" },
 ];
 
 function isActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
+const COLLAPSE_KEY = "jmr-sidebar-collapsed";
+
+// localStorage-backed collapse pref via useSyncExternalStore: no setState-in-
+// effect, and the server snapshot (false) matches first client render, so there
+// is no hydration mismatch.
+function subscribe(onChange: () => void): () => void {
+  window.addEventListener("storage", onChange);
+  return () => window.removeEventListener("storage", onChange);
+}
+function collapsedSnapshot(): boolean {
+  return localStorage.getItem(COLLAPSE_KEY) === "1";
+}
+
 export function Sidebar() {
   const pathname = usePathname() ?? "";
-  // NEXT_PUBLIC_* is inlined at build time, so this is a safe client read of
-  // whether the app is wired to Supabase vs. the in-memory demo data.
-  const liveData = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
+
+  // Collapse only affects lg+ (below lg the rail is already 64px).
+  const collapsed = useSyncExternalStore(subscribe, collapsedSnapshot, () => false);
+  function toggle() {
+    try {
+      localStorage.setItem(COLLAPSE_KEY, collapsed ? "0" : "1");
+    } catch {
+      /* private mode — ignore */
+    }
+    // Same-tab listeners don't get the native storage event; nudge them.
+    window.dispatchEvent(new Event("storage"));
+  }
+
+  // When collapsed, drop the lg:* expand classes so it stays a 64px icon rail.
+  const expandW = collapsed ? "" : "lg:w-60";
+  const showLabel = collapsed ? "hidden" : "hidden lg:inline";
+  const rowExpand = collapsed ? "" : "lg:justify-start lg:px-3";
 
   return (
-    <aside className="flex h-full w-16 shrink-0 flex-col border-r border-slate-800 bg-[#0f172a] lg:w-60">
+    <aside
+      className={cn(
+        "hidden h-full w-16 shrink-0 flex-col border-r border-slate-800 bg-[#0f172a] transition-[width] duration-200 md:flex",
+        expandW,
+      )}
+    >
       {/* Brand */}
       <Link
         href="/dashboard"
-        className="flex h-16 shrink-0 items-center justify-center gap-2.5 border-b border-slate-800 px-2 outline-none focus-visible:bg-slate-800 lg:justify-start lg:px-4"
+        className={cn(
+          "flex h-16 shrink-0 items-center justify-center gap-2.5 border-b border-slate-800 px-2 outline-none focus-visible:bg-slate-800",
+          collapsed ? "" : "lg:justify-start lg:px-4",
+        )}
       >
-        <LogoMark size={34} className="shrink-0" />
-        <span className="hidden min-w-0 flex-col lg:flex">
+        <LogoMark size={34} variant="onDark" className="shrink-0" />
+        <span className={cn("min-w-0 flex-col", collapsed ? "hidden" : "hidden lg:flex")}>
           <span className="truncate text-[15px] font-bold leading-tight text-white">
-            JeniMc<span className="text-emerald-400">Rich</span>
+            Jenny Mcrich
           </span>
           <span className="text-[10px] font-semibold tracking-[0.14em] text-slate-400">
             RECRUITMENT
@@ -174,7 +96,7 @@ export function Sidebar() {
       {/* Primary navigation */}
       <nav
         aria-label="Primary"
-        className="flex-1 space-y-0.5 overflow-y-auto px-2 py-3 lg:px-3"
+        className={cn("flex-1 space-y-0.5 overflow-y-auto px-2 py-3", collapsed ? "" : "lg:px-3")}
       >
         {NAV_ITEMS.map((item) => {
           const active = isActive(pathname, item.href);
@@ -184,35 +106,49 @@ export function Sidebar() {
               href={item.href}
               title={item.label}
               aria-current={active ? "page" : undefined}
-              className={`flex items-center justify-center gap-2.5 rounded-lg px-2 py-2 text-[13.5px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-emerald-400 lg:justify-start lg:px-3 ${
+              className={cn(
+                "group flex items-center justify-center gap-2.5 rounded-lg px-2 py-2 text-[13.5px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-emerald-400",
+                rowExpand,
                 active
                   ? "bg-emerald-600 text-white"
-                  : "text-slate-300 hover:bg-slate-800 hover:text-white"
-              }`}
+                  : "text-slate-300 hover:bg-slate-800 hover:text-white",
+              )}
             >
-              {item.icon}
-              <span className="hidden truncate lg:inline">{item.label}</span>
+              <Icon
+                name={item.icon}
+                size={18}
+                className="shrink-0 transition-transform duration-150 ease-out group-hover:scale-110"
+              />
+              <span className={cn("truncate", showLabel)}>{item.label}</span>
             </Link>
           );
         })}
       </nav>
 
-      {/* Foot: data-source status — reflects whether Supabase is wired up. */}
+      {/* Foot: collapse toggle (lg-only). */}
       <div
-        className="flex h-12 shrink-0 items-center justify-center gap-2 border-t border-slate-800 px-2 lg:justify-start lg:px-4"
-        title={
-          liveData
-            ? "Connected to Supabase — changes persist to the database"
-            : "Running on built-in demo data — Supabase is not connected yet"
-        }
+        className={cn(
+          "flex h-12 shrink-0 items-center justify-center border-t border-slate-800 px-2",
+          rowExpand,
+        )}
       >
-        <span
-          className={`h-1.5 w-1.5 shrink-0 rounded-full ${liveData ? "bg-emerald-500" : "bg-amber-400"}`}
-          aria-hidden="true"
-        />
-        <span className="hidden text-[11px] font-medium text-slate-400 lg:inline">
-          {liveData ? "Supabase connected" : "Demo data mode"}
-        </span>
+        <button
+          type="button"
+          onClick={toggle}
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          aria-expanded={!collapsed}
+          className={cn(
+            "hidden h-7 w-7 place-items-center rounded-lg text-slate-400 outline-none transition-colors hover:bg-slate-800 hover:text-white focus-visible:ring-2 focus-visible:ring-emerald-400 lg:grid",
+            collapsed ? "" : "ml-auto",
+          )}
+        >
+          {/* chevron-right to expand, flipped to chevron-left to collapse */}
+          <Icon
+            name="chevronRight"
+            size={18}
+            className={cn("shrink-0", collapsed ? "" : "rotate-180")}
+          />
+        </button>
       </div>
     </aside>
   );

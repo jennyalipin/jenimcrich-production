@@ -1,6 +1,10 @@
-/** Joins class names, skipping falsy values. Local stand-in for clsx. */
-export function cn(
-  ...values: Array<string | false | null | undefined>
-): string {
-  return values.filter((v): v is string => typeof v === "string" && v !== "").join(" ");
+import { clsx, type ClassValue } from "clsx";
+import { twMerge } from "tailwind-merge";
+
+/**
+ * Join class names, resolving Tailwind conflicts (last wins). Used app-wide
+ * and by shadcn/Radix components.
+ */
+export function cn(...inputs: ClassValue[]): string {
+  return twMerge(clsx(inputs));
 }

@@ -2,7 +2,7 @@ import { Card } from "@/components/ui";
 import {
   ACTIVE_STAGES,
   displayNow,
-  getCandidates,
+  getCandidateSkillNames,
   getClients,
   getJobs,
   type JobStatus,
@@ -15,7 +15,7 @@ import { JobsTable, type JobRow } from "./jobs-table";
 import { NewJobButton } from "./new-job-button";
 import type { Metadata } from "next";
 
-export const metadata: Metadata = { title: "Jobs — JeniMcRich Recruitment" };
+export const metadata: Metadata = { title: "Jobs — Jenny Mcrich Recruitment" };
 
 const STATUS_ORDER: Record<JobStatus, number> = { open: 0, on_hold: 1, closed: 2 };
 
@@ -39,11 +39,11 @@ function buildSkillDictionary(
 }
 
 export default async function JobsPage() {
-  const [dataJobs, localJobs, clients, candidates] = await Promise.all([
+  const [dataJobs, localJobs, clients, candidateSkills] = await Promise.all([
     getJobs(),
     listLocalJobs(),
     getClients(),
-    getCandidates(),
+    getCandidateSkillNames(),
   ]);
 
   // Locally created jobs surface at the top of their status group
@@ -72,10 +72,7 @@ export default async function JobsPage() {
   const onHoldCount = jobs.filter((j) => j.status === "on_hold").length;
   const closedCount = jobs.filter((j) => j.status === "closed").length;
 
-  const skillDictionary = buildSkillDictionary(
-    jobs,
-    candidates.flatMap((c) => c.skills.map((s) => s.skill)),
-  );
+  const skillDictionary = buildSkillDictionary(jobs, candidateSkills);
 
   return (
     <div className="p-6">

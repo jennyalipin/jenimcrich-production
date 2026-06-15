@@ -12,26 +12,15 @@ const geistSans = localFont({
   display: "swap",
 });
 
-// Signifier — the licensed high-contrast serif, for occasional accent words.
-const serif = localFont({
-  src: [
-    { path: "./fonts/Signifier-Regular.woff2", weight: "400", style: "normal" },
-    { path: "./fonts/Signifier-Italic.woff2", weight: "400", style: "italic" },
-    { path: "./fonts/Signifier-Medium.woff2", weight: "500", style: "normal" },
-  ],
-  variable: "--font-fraunces",
-  display: "swap",
-});
-
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
 });
 
 export const metadata: Metadata = {
-  title: "JeniMcRich Recruitment",
+  title: "Jenny Mcrich Recruitment",
   description:
-    "Applicant tracking for JeniMcRich Recruitment — heavy-industry placements",
+    "Applicant tracking for Jenny Mcrich Recruitment — heavy-industry placements",
 };
 
 export default function RootLayout({
@@ -42,7 +31,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${serif.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col font-sans">
         <AppShell>{children}</AppShell>

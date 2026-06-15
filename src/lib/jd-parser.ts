@@ -11,6 +11,10 @@
  */
 
 import type { JobSkill, SkillWeight, VisaRequirement } from "./types";
+import { isTnEligible, type TnEligibilityResult } from "./tn-eligibility";
+
+/** TN visa requirement values that warrant a USMCA eligibility screen. */
+const TN_VISAS: readonly VisaRequirement[] = ["TN_CANADIAN_ONLY", "TN_CANADIAN_OR_MEXICAN"];
 
 /** Structured fields extracted from raw JD text. Empty string / null / [] when not found. */
 export interface ParsedJD {
@@ -29,6 +33,12 @@ export interface ParsedJD {
   visaNotes: string;
   /** First substantial paragraph, trimmed to 300 chars. */
   description: string;
+  /**
+   * TN/USMCA professional-eligibility screen of the parsed title — populated
+   * only when the detected visa is a TN type, else null. NOT legal advice
+   * (see lib/tn-eligibility): always pending attorney sign-off.
+   */
+  tnEligibility: TnEligibilityResult | null;
 }
 
 /**
@@ -198,6 +208,9 @@ export function parseJD(
     .find((p) => p.length > 60 && !/^[-•*]/.test(p));
   const description = (paragraph ?? "").slice(0, 300);
 
+  // --- TN/USMCA eligibility screen (TN roles only) -------------------------
+  const tnEligibility = TN_VISAS.includes(visa) ? isTnEligible(title) : null;
+
   return {
     title,
     client,
@@ -209,5 +222,6 @@ export function parseJD(
     visa,
     visaNotes,
     description,
+    tnEligibility,
   };
 }

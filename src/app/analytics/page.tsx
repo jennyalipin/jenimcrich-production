@@ -15,7 +15,7 @@ import { TimeInStageChart } from "@/components/charts/time-in-stage-chart";
 import { STAGE_CHART_COLORS } from "@/components/charts/theme";
 
 export const metadata: Metadata = {
-  title: "Analytics & Reports — JeniMcRich Recruitment",
+  title: "Analytics & Reports — Jenny Mcrich Recruitment",
 };
 
 const MONTHS_SHOWN = 6;
@@ -215,7 +215,7 @@ export default async function AnalyticsPage() {
         <Card>
           <CardHeader>
             <CardTitle>Recruiter activity</CardTitle>
-            <p className="text-xs text-slate-500">all-time, demo dataset</p>
+            <p className="text-xs text-slate-500">all-time</p>
           </CardHeader>
           <div className="grid grid-cols-2 gap-px overflow-hidden rounded-b-card bg-slate-100 sm:grid-cols-3 lg:grid-cols-5">
             <ActivityTile label="Emails sent" value={counts.emails_sent} />
