@@ -60,20 +60,13 @@ create table public.tn_compliance (
   legal_review_notes        text,
 
   -- Immigration-document retention window. TN paperwork is kept for 3 years
-  -- after hire, or 1 year after employment ends, whichever is later.
+  -- after hire, or 1 year after employment ends, whichever is later. Maintained
+  -- by tn_compliance_set_retention() below — NOT a generated column, since
+  -- `timestamptz + interval` is only STABLE (timezone-dependent) and Postgres
+  -- rejects non-immutable generation expressions.
   hired_at                  timestamptz,
   employment_ended_at       timestamptz,
-  retention_until           timestamptz generated always as (
-                              case
-                                when hired_at is null then null
-                                when employment_ended_at is null
-                                  then hired_at + interval '3 years'
-                                else greatest(
-                                  hired_at + interval '3 years',
-                                  employment_ended_at + interval '1 year'
-                                )
-                              end
-                            ) stored,
+  retention_until           timestamptz,
 
   created_at                timestamptz not null default now(),
   updated_at                timestamptz not null default now(),
@@ -85,6 +78,31 @@ create index tn_compliance_application_id_idx on public.tn_compliance (applicati
 create trigger tn_compliance_set_updated_at
   before update on public.tn_compliance
   for each row execute function public.set_updated_at();
+
+-- Maintain retention_until from hired_at / employment_ended_at (replaces the
+-- generated column — interval math isn't immutable enough for one).
+create or replace function public.tn_compliance_set_retention()
+returns trigger
+language plpgsql
+as $$
+begin
+  if new.hired_at is null then
+    new.retention_until := null;
+  elsif new.employment_ended_at is null then
+    new.retention_until := new.hired_at + interval '3 years';
+  else
+    new.retention_until := greatest(
+      new.hired_at + interval '3 years',
+      new.employment_ended_at + interval '1 year'
+    );
+  end if;
+  return new;
+end;
+$$;
+
+create trigger tn_compliance_set_retention
+  before insert or update on public.tn_compliance
+  for each row execute function public.tn_compliance_set_retention();
 
 -- ----------------------------------------------------------------------------
 -- RLS — mirrors the candidate-data matrix (domain rule 7):
