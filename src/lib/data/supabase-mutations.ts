@@ -873,7 +873,9 @@ export async function sbClearLegalReview(
     })
     .eq("application_id", applicationId)
     .select(TN_COLUMNS)
-    .single();
+    // maybeSingle (not single): zero rows must return null so the guard below
+    // fires with a human message instead of a raw PGRST116 error.
+    .maybeSingle();
   fail("clear the legal review", error);
   if (!data) {
     throw new DataLayerError(

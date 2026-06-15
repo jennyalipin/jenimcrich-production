@@ -111,3 +111,34 @@ create policy "tn_compliance: recruiters and admins update"
 create policy "tn_compliance: admins delete"
   on public.tn_compliance for delete to authenticated
   using ((select public.has_role('admin')));
+
+-- ----------------------------------------------------------------------------
+-- Admin-only legal-review interlock. The UPDATE policy above lets recruiters
+-- edit the row (eligibility result, retention dates), but the attorney-signoff
+-- columns must be admin-only. Postgres has no column-level RLS, so a BEFORE
+-- UPDATE trigger blocks any non-admin from changing them. This is the real DB
+-- gate behind clearLegalReviewAction's app-level admin re-check. (A service-role
+-- request has no auth.uid() and is intentionally not blocked — trusted server.)
+-- ----------------------------------------------------------------------------
+create or replace function public.tn_compliance_guard_legal_review()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if (new.legal_review_required   is distinct from old.legal_review_required
+      or new.legal_review_cleared_at is distinct from old.legal_review_cleared_at
+      or new.legal_review_cleared_by is distinct from old.legal_review_cleared_by
+      or new.legal_review_notes      is distinct from old.legal_review_notes)
+     and public.current_user_role() is distinct from 'admin'
+     and auth.uid() is not null then
+    raise exception 'Only an admin may change the legal-review interlock columns';
+  end if;
+  return new;
+end;
+$$;
+
+create trigger tn_compliance_guard_legal_review
+  before update on public.tn_compliance
+  for each row execute function public.tn_compliance_guard_legal_review();

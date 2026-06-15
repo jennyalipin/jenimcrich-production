@@ -40,6 +40,15 @@ export async function runTnEligibilityCheckAction(
 ): Promise<TnActionResult> {
   const id = applicationId.trim();
   if (!id) return { ok: false, error: "Missing application." };
+  // Require a signed-in user on the live path (RLS enforces this too; the demo
+  // store has no auth and is allowed through).
+  const supabase = await getSupabaseServerClient();
+  if (supabase) {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return { ok: false, error: "Please sign in first." };
+  }
   try {
     const status = await runTnEligibilityCheck(id);
     if (candidateId.trim()) revalidatePath(`/candidates/${candidateId.trim()}`);
@@ -62,14 +71,16 @@ export async function clearLegalReviewAction(
   const id = applicationId.trim();
   if (!id) return { ok: false, error: "Missing application." };
 
-  // Admin re-check (defence in depth). On the demo store (no Supabase client)
-  // there is no signed-in role to enforce, so the demo path is allowed through.
+  // Recording an attorney sign-off is an admin-only production action: require
+  // a live workspace and re-check the admin role here (defence in depth on top
+  // of the RLS update policy + the admin-only column trigger in 0013).
   const supabase = await getSupabaseServerClient();
-  if (supabase) {
-    const role = await currentProfileRole(supabase);
-    if (role !== "admin") {
-      return { ok: false, error: "Only an admin can record the attorney sign-off." };
-    }
+  if (!supabase) {
+    return { ok: false, error: "Sign in to a live workspace to record attorney sign-off." };
+  }
+  const role = await currentProfileRole(supabase);
+  if (role !== "admin") {
+    return { ok: false, error: "Only an admin can record the attorney sign-off." };
   }
 
   try {

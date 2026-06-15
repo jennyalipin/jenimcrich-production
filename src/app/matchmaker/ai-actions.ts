@@ -1,7 +1,7 @@
 "use server";
 
 import { z } from "zod";
-import { parseResumeFromFile, parseResumeWithAI } from "@/lib/ai";
+import { isAIEnabled, parseResumeFromFile, parseResumeWithAI } from "@/lib/ai";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { getDocumentSignedUrl } from "@/app/candidates/_lib/documents-actions";
 import { DEFAULT_SKILL_DICTIONARY } from "@/lib/jd-parser";
@@ -47,6 +47,10 @@ export async function parseResumeFileAction(
   if (!candidateId || !documentId) {
     return { ok: false, error: "Missing candidate or document." };
   }
+
+  // Gate the whole flow on the feature flag — don't even resolve a signed URL
+  // or fetch bytes when AI is off (matches templates/ai-actions + chat route).
+  if (!isAIEnabled()) return { ok: false, error: "AI parsing is not configured." };
 
   const supabase = await getSupabaseServerClient();
   if (!supabase) return { ok: false, error: "AI parsing is not configured." };

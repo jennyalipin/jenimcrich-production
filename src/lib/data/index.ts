@@ -1578,16 +1578,18 @@ function composeTnChecklist(args: {
     };
   }
 
-  // No persisted screen yet — compute a live (unsaved) one from the title.
-  const live = isTnEligible(jobTitle);
+  // No persisted screen yet — this is the zero-state. We do NOT surface a
+  // computed verdict here (eligible:null → the panel shows "Not screened" and a
+  // "Run eligibility check" button); running the check persists a result and the
+  // branch above then renders it. legalReviewRequired stays true regardless.
   return {
     applicationId,
     jobTitle,
     visa,
-    eligible: live.eligible,
-    matchedOccupation: live.matchedOccupation,
-    confidence: live.confidence,
-    legalReviewRequired: live.legalReviewRequired,
+    eligible: null,
+    matchedOccupation: null,
+    confidence: null,
+    legalReviewRequired: true,
     legalReviewClearedAt: record?.legal_review_cleared_at ?? null,
     legalReviewNotes: record?.legal_review_notes ?? null,
     docs,
@@ -1712,9 +1714,18 @@ export async function runTnEligibilityCheck(applicationId: string): Promise<TnCh
       `${screen.matchedOccupation ? ` (${screen.matchedOccupation})` : ""} — pending legal review`,
     "Jenny M.",
   );
-  const checklist = await getTnChecklist(applicationId);
-  if (!checklist) throw new DataLayerError("NOT_FOUND", "That application could not be found.");
-  return checklist;
+  // Build inline from the store we just mutated — avoid re-entering
+  // getTnChecklist()/getStore() (cache()-wrapped) after a write.
+  const docCategories = s.documents
+    .filter((d) => d.candidate_id === app.candidate_id)
+    .map((d) => d.category as string);
+  return composeTnChecklist({
+    applicationId,
+    jobTitle: job.title,
+    visa: job.visa,
+    record: null,
+    docCategories,
+  });
 }
 
 /**
@@ -1753,9 +1764,17 @@ export async function clearTnLegalReview(
     `Legal review cleared by immigration attorney${notes.trim() ? ` — ${notes.trim()}` : ""}`,
     "Jenny M.",
   );
-  const checklist = await getTnChecklist(applicationId);
-  if (!checklist) throw new DataLayerError("NOT_FOUND", "That application could not be found.");
-  return checklist;
+  const job = s.jobs.find((j) => j.id === app.job_id);
+  const docCategories = s.documents
+    .filter((d) => d.candidate_id === app.candidate_id)
+    .map((d) => d.category as string);
+  return composeTnChecklist({
+    applicationId,
+    jobTitle: job?.title ?? "",
+    visa: (job?.visa ?? "UNSPECIFIED") as VisaType,
+    record: null,
+    docCategories,
+  });
 }
 
 /** True when an application's job carries a TN visa requirement. */
