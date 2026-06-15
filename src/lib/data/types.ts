@@ -437,6 +437,35 @@ export interface StageTime {
   avg_days: number;
 }
 
+/**
+ * Flattened dashboard view-models. The dashboard only renders a few fields, so
+ * it doesn't carry the full `StalledApplication` / `InterviewWithRelations`
+ * graphs (those stay for the calendar / candidate detail). Keeping these light
+ * lets the dashboard be served from bounded SQL aggregates instead of the whole
+ * store — see `dashboard_stats` (migration 0010).
+ */
+export interface DashboardStalled {
+  application_id: string;
+  candidate_id: string;
+  candidate_name: string;
+  candidate_flagged: boolean;
+  job_title: string;
+  client_name: string;
+  stage: Stage;
+  days_stalled: number;
+}
+
+export interface DashboardInterview {
+  id: string;
+  candidate_id: string;
+  candidate_name: string;
+  job_title: string;
+  interview_type: InterviewType;
+  starts_at: string;
+  interviewer_name: string;
+  stage: Stage;
+}
+
 export interface DashboardStats {
   stage_counts: Record<Stage, number>;
   active_candidates: number;
@@ -447,10 +476,35 @@ export interface DashboardStats {
   hired_total: number;
   avg_time_to_hire_days: number;
   stalled_count: number;
-  stalled: StalledApplication[];
-  todays_interviews: InterviewWithRelations[];
-  upcoming_interviews: InterviewWithRelations[];
+  stalled: DashboardStalled[];
+  todays_interviews: DashboardInterview[];
+  upcoming_interviews: DashboardInterview[];
   recent_activity: ActivityFeedItem[];
+}
+
+/**
+ * A pipeline-board card — flattened, with the match score read from the cached
+ * `applications.match_score` so the board never re-scores every application.
+ * Fields mirror the board's `BoardCard`. The board caps columns at a per-stage
+ * limit; `PipelineBoardData.counts` carries the true per-stage totals.
+ */
+export interface PipelineCard {
+  applicationId: string;
+  candidateId: string;
+  jobId: string;
+  candidateName: string;
+  flagged: boolean;
+  jobTitle: string;
+  restrictiveVisa: boolean;
+  score: number;
+  stage: Stage;
+  daysInStage: number;
+  isStalled: boolean;
+}
+
+export interface PipelineBoardData {
+  cards: PipelineCard[];
+  counts: Record<Stage, number>;
 }
 
 export interface AnalyticsData {
