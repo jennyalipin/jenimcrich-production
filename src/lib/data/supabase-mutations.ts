@@ -535,6 +535,37 @@ export async function sbRemoveCandidateTag(
 /* Job overlay writes (job-store)                                      */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Resolve a client by name, creating one when it doesn't exist yet. The Jobs
+ * "New job" flow lets the owner type a client name freely (a new client they
+ * just signed), so a brand-new name must yield a real `clients` row — the demo
+ * `local-cl-…` placeholder is not a valid uuid for the FK. Match is
+ * case-insensitive on the trimmed name to avoid duplicating an existing client.
+ */
+export async function sbResolveClientId(
+  supabase: SupabaseServerClient,
+  name: string,
+): Promise<string> {
+  const trimmed = name.trim();
+  const { data: existing, error: findErr } = await supabase
+    .from("clients")
+    .select("id")
+    .ilike("name", trimmed)
+    .is("archived_at", null)
+    .limit(1)
+    .maybeSingle();
+  fail("look up the client", findErr);
+  if (existing) return existing.id;
+
+  const { data: created, error: createErr } = await supabase
+    .from("clients")
+    .insert({ name: trimmed })
+    .select("id")
+    .single();
+  fail("create the client", createErr);
+  return created!.id;
+}
+
 export async function sbCreateJob(
   supabase: SupabaseServerClient,
   input: {

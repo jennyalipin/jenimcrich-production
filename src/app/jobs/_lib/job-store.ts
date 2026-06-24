@@ -23,7 +23,12 @@ import {
   type VisaType,
 } from "@/lib/data/types";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
-import { sbAddJobNote, sbCreateJob, sbGetJobNotes } from "@/lib/data/supabase-mutations";
+import {
+  sbAddJobNote,
+  sbCreateJob,
+  sbGetJobNotes,
+  sbResolveClientId,
+} from "@/lib/data/supabase-mutations";
 
 if (typeof window !== "undefined") {
   throw new Error(
@@ -159,9 +164,15 @@ export async function createLocalJob(input: LocalJobInput): Promise<JobWithStats
   const supabase = await getSupabaseServerClient();
   if (supabase) {
     const ts = nowIso();
+    // The action passes a real client id when the typed name matched an
+    // existing client, otherwise a `local-cl-…` placeholder. The placeholder
+    // isn't a valid uuid, so resolve (or create) a real client row first.
+    const clientId = input.client_id.startsWith("local-cl-")
+      ? await sbResolveClientId(supabase, input.client_name)
+      : input.client_id;
     const id = await sbCreateJob(supabase, {
       title: input.title,
-      client_id: input.client_id,
+      client_id: clientId,
       location: input.location,
       salary_range: input.salary_range,
       min_years: input.min_years,
@@ -175,7 +186,7 @@ export async function createLocalJob(input: LocalJobInput): Promise<JobWithStats
     });
     return {
       id,
-      client_id: input.client_id,
+      client_id: clientId,
       client_name: input.client_name,
       title: input.title,
       location: input.location,
